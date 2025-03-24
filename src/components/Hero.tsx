@@ -1,115 +1,67 @@
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import AnimatedGradient from './ui/AnimatedGradient';
 import GlassMorphism from './ui/GlassMorphism';
-import { ArrowRight, Code, Workflow, Bot, Zap, Layers, Layout } from 'lucide-react';
+import { ArrowRight, Bot, BrainCircuit } from 'lucide-react';
 
 const Hero: React.FC = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('animate-fade-in');
-            entry.target.classList.remove('opacity-0');
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-    
-    const elements = containerRef.current?.querySelectorAll('.animate-on-scroll');
-    elements?.forEach((el) => {
-      observer.observe(el);
-    });
-    
-    return () => {
-      elements?.forEach((el) => {
-        observer.unobserve(el);
-      });
-    };
-  }, []);
-
   return (
-    <section className="min-h-screen pt-24 pb-16 px-4 relative overflow-hidden" ref={containerRef}>
-      {/* Background Gradient Animation */}
-      <div className="absolute inset-0 bg-gradient-to-b from-secondary via-background to-background z-0" />
+    <section className="relative pt-24 pb-20 overflow-hidden sm:py-32">
+      {/* Background gradient */}
+      <AnimatedGradient 
+        className="absolute top-0 left-0 right-0 bottom-0 opacity-20" 
+        colors={['#8B5CF6', '#EC4899', '#3B82F6']}
+      />
       
-      {/* Floating Elements */}
-      <div className="absolute top-1/4 left-10 w-64 h-64 rounded-full bg-primary/5 blur-3xl animate-float" />
-      <div className="absolute bottom-1/4 right-10 w-72 h-72 rounded-full bg-primary/5 blur-3xl animate-float animate-delay-500" />
-      
-      <div className="container mx-auto relative z-10">
-        <div className="flex flex-col items-center text-center max-w-4xl mx-auto">
-          <div className="mb-3 animate-on-scroll opacity-0 animate-delay-100">
-            <span className="pill bg-secondary text-primary-foreground">
-              All-in-One Solution
+      <div className="container px-4 mx-auto relative z-10">
+        <div className="flex flex-col items-center text-center">
+          <GlassMorphism className="inline-flex items-center px-4 py-2 mb-8 rounded-full" intensity="light">
+            <span className="text-sm font-medium text-primary">
+              AI-powered development assistant
             </span>
-          </div>
+          </GlassMorphism>
           
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 animate-on-scroll opacity-0">
-            <span className="text-gradient">AI-Powered</span> Coding <br className="hidden md:block" />
-            & Automation Agent
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 gradient-text tracking-tight">
+            All-in-One AI <br />Development Agent
           </h1>
           
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl animate-on-scroll opacity-0 animate-delay-200">
-            Build, automate, and optimize digital solutions with our advanced AI consultant.
-            Seamlessly generate code, create workflows, and develop AI-driven applications.
+          <p className="text-lg md:text-xl text-foreground/80 max-w-3xl mb-8">
+            Build, automate, and optimize digital solutions using AI. Generate code, create automation workflows, and develop custom AI agents for your projects.
           </p>
           
-          <div className="flex flex-col sm:flex-row gap-4 mb-16 animate-on-scroll opacity-0 animate-delay-300">
-            <Button size="lg" className="group">
-              Get Started
-              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+          <div className="flex flex-col sm:flex-row gap-4 mb-12">
+            <Button size="lg" className="gap-2 group" asChild>
+              <Link to="/signup">
+                Get Started
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
             </Button>
-            <Button variant="outline" size="lg">
-              View Demo
+            <Button size="lg" variant="outline" asChild>
+              <Link to="/dashboard">Try Demo</Link>
             </Button>
           </div>
           
-          {/* Feature Icons */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 w-full max-w-3xl mx-auto mb-16">
-            {[
-              { icon: <Code className="h-6 w-6" />, label: "Code Generation", delay: 400 },
-              { icon: <Workflow className="h-6 w-6" />, label: "Workflow Automation", delay: 500 },
-              { icon: <Bot className="h-6 w-6" />, label: "AI Agents", delay: 600 },
-              { icon: <Zap className="h-6 w-6" />, label: "API Integration", delay: 700 },
-              { icon: <Layers className="h-6 w-6" />, label: "ML Integration", delay: 800 },
-              { icon: <Layout className="h-6 w-6" />, label: "UI Development", delay: 900 }
-            ].map((feature, index) => (
-              <GlassMorphism 
-                key={index}
-                className={`p-4 flex flex-col items-center text-center animate-on-scroll opacity-0 hover-lift animate-delay-${feature.delay}`}
-              >
-                <div className="p-3 bg-primary/10 rounded-full mb-3">
-                  {feature.icon}
+          <GlassMorphism className="p-4 max-w-4xl w-full" intensity="medium">
+            <div className="aspect-video relative overflow-hidden rounded-lg border border-foreground/10 bg-gradient-to-br from-background to-secondary/10">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex items-center justify-center space-x-4">
+                  <Bot className="h-12 w-12 text-primary animate-pulse-slow" />
+                  <span className="text-xl font-medium">AI Development Agent</span>
                 </div>
-                <span className="text-sm font-medium">{feature.label}</span>
-              </GlassMorphism>
-            ))}
-          </div>
-          
-          {/* Visual Element */}
-          <div className="w-full animate-on-scroll opacity-0 animate-delay-1000">
-            <GlassMorphism className="w-full p-1 overflow-hidden rounded-lg">
-              <AnimatedGradient 
-                className="h-64 md:h-80 rounded-lg" 
-                gradientColors="from-blue-500/30 via-purple-500/30 to-pink-500/30"
-              >
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-xl font-semibold text-white">
-                    Interactive Demo
-                  </div>
-                </div>
-              </AnimatedGradient>
-            </GlassMorphism>
-          </div>
+              </div>
+            </div>
+          </GlassMorphism>
         </div>
       </div>
     </section>
+  );
+};
+
+const BrainCircuitIcon: React.FC<{ className?: string }> = ({ className }) => {
+  return (
+    <BrainCircuit className={className} />
   );
 };
 

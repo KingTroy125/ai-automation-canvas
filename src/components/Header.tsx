@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import GlassMorphism from './ui/GlassMorphism';
 import { Menu, X } from 'lucide-react';
@@ -40,7 +41,7 @@ const Header: React.FC = () => {
       >
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center">
-            <span className="text-xl font-semibold text-gradient">AI Agent</span>
+            <Link to="/" className="text-xl font-semibold text-gradient">AI Agent</Link>
           </div>
           
           {/* Desktop Navigation */}
@@ -57,8 +58,12 @@ const Header: React.FC = () => {
           </nav>
           
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="secondary" size="sm">Sign In</Button>
-            <Button size="sm">Get Started</Button>
+            <Button variant="secondary" size="sm" asChild>
+              <Link to="/login">Sign In</Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link to="/signup">Get Started</Link>
+            </Button>
           </div>
           
           {/* Mobile Menu Toggle */}
@@ -90,8 +95,12 @@ const Header: React.FC = () => {
               </a>
             ))}
             <div className="flex flex-col space-y-3 pt-4">
-              <Button variant="outline" size="sm">Sign In</Button>
-              <Button size="sm">Get Started</Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>Sign In</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link to="/signup" onClick={() => setIsMobileMenuOpen(false)}>Get Started</Link>
+              </Button>
             </div>
           </nav>
         </GlassMorphism>
