@@ -41,8 +41,11 @@ interface ChatTriggerConfig {
   keywords: string[];
 }
 
-// Union type for all possible trigger configs
-type TriggerConfig = FileTypesTriggerConfig | ScheduleTriggerConfig | ChatTriggerConfig;
+// Union type for all possible trigger configs using discriminated union
+type TriggerConfig = 
+  | ({ type: 'document_upload' } & FileTypesTriggerConfig)
+  | ({ type: 'schedule' } & ScheduleTriggerConfig)
+  | ({ type: 'chat_message' } & ChatTriggerConfig);
 
 interface WorkflowAction {
   id: string;
@@ -55,7 +58,7 @@ interface WorkflowTrigger {
   id: string;
   type: string;
   name: string;
-  config: TriggerConfig;
+  config: TriggerConfig | FileTypesTriggerConfig | ScheduleTriggerConfig | ChatTriggerConfig;
 }
 
 interface Workflow {
@@ -78,6 +81,7 @@ const initialWorkflows: Workflow[] = [
       type: 'document_upload',
       name: 'New Document Upload',
       config: {
+        type: 'document_upload',
         fileTypes: ['pdf', 'docx', 'txt']
       }
     },
@@ -114,6 +118,7 @@ const initialWorkflows: Workflow[] = [
       type: 'schedule',
       name: 'Weekly Schedule',
       config: {
+        type: 'schedule',
         frequency: 'weekly',
         day: 'friday',
         time: '16:00'
@@ -156,8 +161,9 @@ const WorkflowAutomation: React.FC = () => {
       type: 'document_upload',
       name: 'New Document Upload',
       config: {
+        type: 'document_upload',
         fileTypes: ['pdf', 'docx', 'txt']
-      } as FileTypesTriggerConfig
+      }
     },
     actions: [],
     isActive: true
@@ -245,8 +251,9 @@ const WorkflowAutomation: React.FC = () => {
         type: 'document_upload',
         name: 'New Document Upload',
         config: {
+          type: 'document_upload',
           fileTypes: ['pdf', 'docx', 'txt']
-        } as FileTypesTriggerConfig
+        }
       },
       actions: [],
       isActive: true
@@ -446,13 +453,24 @@ const WorkflowAutomation: React.FC = () => {
                           
                           if (value === 'schedule') {
                             triggerName = 'Weekly Schedule';
-                            config = { frequency: 'weekly', day: 'monday', time: '09:00' } as ScheduleTriggerConfig;
+                            config = { 
+                              type: 'schedule',
+                              frequency: 'weekly', 
+                              day: 'monday', 
+                              time: '09:00' 
+                            };
                           } else if (value === 'chat_message') {
                             triggerName = 'New Chat Message';
-                            config = { keywords: [] } as ChatTriggerConfig;
+                            config = { 
+                              type: 'chat_message',
+                              keywords: [] 
+                            };
                           } else {
                             // Default to document_upload type
-                            config = { fileTypes: ['pdf', 'docx', 'txt'] } as FileTypesTriggerConfig;
+                            config = { 
+                              type: 'document_upload',
+                              fileTypes: ['pdf', 'docx', 'txt'] 
+                            };
                           }
                           
                           setNewWorkflow({
@@ -516,16 +534,20 @@ const WorkflowAutomation: React.FC = () => {
                                 <Label htmlFor="schedule-frequency">Frequency</Label>
                                 <Select 
                                   value={(newWorkflow.trigger?.config as ScheduleTriggerConfig)?.frequency || 'weekly'} 
-                                  onValueChange={(value) => setNewWorkflow({
-                                    ...newWorkflow,
-                                    trigger: {
-                                      ...newWorkflow.trigger as WorkflowTrigger,
-                                      config: {
-                                        ...newWorkflow.trigger?.config,
-                                        frequency: value
-                                      } as ScheduleTriggerConfig
-                                    }
-                                  })}
+                                  onValueChange={(value) => {
+                                    const currentConfig = newWorkflow.trigger?.config as ScheduleTriggerConfig;
+                                    setNewWorkflow({
+                                      ...newWorkflow,
+                                      trigger: {
+                                        ...newWorkflow.trigger as WorkflowTrigger,
+                                        config: {
+                                          type: 'schedule',
+                                          ...currentConfig,
+                                          frequency: value
+                                        }
+                                      }
+                                    });
+                                  }}
                                 >
                                   <SelectTrigger id="schedule-frequency">
                                     <SelectValue />
@@ -543,16 +565,20 @@ const WorkflowAutomation: React.FC = () => {
                                   <Label htmlFor="schedule-day">Day</Label>
                                   <Select 
                                     value={(newWorkflow.trigger?.config as ScheduleTriggerConfig)?.day || 'monday'} 
-                                    onValueChange={(value) => setNewWorkflow({
-                                      ...newWorkflow,
-                                      trigger: {
-                                        ...newWorkflow.trigger as WorkflowTrigger,
-                                        config: {
-                                          ...newWorkflow.trigger?.config,
-                                          day: value
-                                        } as ScheduleTriggerConfig
-                                      }
-                                    })}
+                                    onValueChange={(value) => {
+                                      const currentConfig = newWorkflow.trigger?.config as ScheduleTriggerConfig;
+                                      setNewWorkflow({
+                                        ...newWorkflow,
+                                        trigger: {
+                                          ...newWorkflow.trigger as WorkflowTrigger,
+                                          config: {
+                                            type: 'schedule',
+                                            ...currentConfig,
+                                            day: value
+                                          }
+                                        }
+                                      });
+                                    }}
                                   >
                                     <SelectTrigger id="schedule-day">
                                       <SelectValue />
