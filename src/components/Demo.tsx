@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import GlassMorphism from './ui/GlassMorphism';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Code, FileText, Bot, Workflow,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Layout
 } from 'lucide-react';
 
 interface DemoStep {
@@ -266,7 +265,6 @@ function App() {
 
 export default Demo;
 
-// This is needed for the missing icon that was used in the component
 const BrainCircuit: React.FC<{ className?: string }> = ({ className }) => {
   return (
     <svg
