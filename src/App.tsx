@@ -9,6 +9,14 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import ChatAssistant from "./pages/ChatAssistant";
+import CodeGeneration from "./pages/CodeGeneration";
+import DocumentAnalysis from "./pages/DocumentAnalysis";
+import AIAgents from "./pages/AIAgents";
+import WorkflowAutomation from "./pages/WorkflowAutomation";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import MonthlyPlan from "./pages/MonthlyPlan";
 
 const queryClient = new QueryClient();
 
@@ -23,8 +31,22 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          {/* Redirect /dashboard/* routes to the main dashboard for now */}
+          
+          {/* AI Tool Routes */}
+          <Route path="/dashboard/chat" element={<ChatAssistant />} />
+          <Route path="/dashboard/code-generation" element={<CodeGeneration />} />
+          <Route path="/dashboard/documents" element={<DocumentAnalysis />} />
+          <Route path="/dashboard/agents" element={<AIAgents />} />
+          <Route path="/dashboard/workflows" element={<WorkflowAutomation />} />
+          
+          {/* Account Routes */}
+          <Route path="/dashboard/profile" element={<Profile />} />
+          <Route path="/dashboard/settings" element={<Settings />} />
+          <Route path="/dashboard/plans" element={<MonthlyPlan />} />
+          
+          {/* Redirect /dashboard/* routes to the main dashboard for any undefined routes */}
           <Route path="/dashboard/*" element={<Navigate to="/dashboard" replace />} />
+          
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
