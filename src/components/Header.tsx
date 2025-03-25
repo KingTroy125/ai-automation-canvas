@@ -45,7 +45,7 @@ const Header: React.FC = () => {
           </div>
           
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-1">
+          <nav className="hidden md:flex space-x-1 flex-1 justify-center">
             {navLinks.map(link => (
               <a 
                 key={link.href} 
@@ -58,9 +58,6 @@ const Header: React.FC = () => {
           </nav>
           
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="secondary" size="sm" asChild>
-              <Link to="/login">Sign In</Link>
-            </Button>
             <Button size="sm" asChild>
               <Link to="/signup">Get Started</Link>
             </Button>
