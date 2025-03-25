@@ -63,7 +63,7 @@ const Signup: React.FC = () => {
               <FormItem>
                 <FormLabel>Full Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="John Doe" {...field} />
+                  <Input placeholder="Joe Smith" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
