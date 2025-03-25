@@ -1,69 +1,49 @@
-# Welcome to your Lovable project
+# AI Automation Canvas
 
-## Project info
+[![License](https://img.shields.io/github/license/KingTroy125/ai-automation-canvas)](LICENSE)
 
-**URL**: https://lovable.dev/projects/09825bc2-18bc-4645-9624-56bdab15ac77
+AI Automation Canvas is a powerful tool designed to streamline and automate various AI-driven workflows. This project enables users to build, test, and deploy AI automation solutions effortlessly.
 
-## How can I edit this code?
+## Features
+- **Drag-and-Drop Interface**: Easily create AI automation workflows with a user-friendly canvas.
+- **Pre-Built AI Modules**: Utilize a collection of AI-powered components for automation.
+- **Custom Integrations**: Connect with third-party APIs and services for extended functionality.
+- **Real-Time Execution**: Run and test automation workflows in real-time.
+- **Secure and Scalable**: Designed with security and scalability in mind for professional use.
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/09825bc2-18bc-4645-9624-56bdab15ac77) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Installation
+To set up the project locally, follow these steps:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Clone the repository
+git clone https://github.com/KingTroy125/ai-automation-canvas.git
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to the project directory
+cd ai-automation-canvas
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Install dependencies (for both frontend and backend if applicable)
+npm install   # or yarn install
 ```
 
-**Edit a file directly in GitHub**
+## Usage
+To start the development server:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+npm run dev   # or yarn dev
+```
 
-**Use GitHub Codespaces**
+To build the project for production:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```sh
+npm run build   # or yarn build
+```
 
-## What technologies are used for this project?
+## Contributing
+Contributions are welcome! If you'd like to contribute, please fork the repository and submit a pull request with your changes.
 
-This project is built with .
+## License
+This project is licensed under the [MIT License](LICENSE).
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Contact
+For any inquiries or support, please reach out to [your contact email or GitHub issues].
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/09825bc2-18bc-4645-9624-56bdab15ac77) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
