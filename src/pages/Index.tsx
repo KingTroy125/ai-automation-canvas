@@ -5,6 +5,7 @@ import Hero from '@/components/Hero';
 import Features from '@/components/Features';
 import Demo from '@/components/Demo';
 import Footer from '@/components/Footer';
+import Plan from '@/components/MonthlyPlan';
 
 const Index: React.FC = () => {
   // Add smooth scroll behavior for anchor links
@@ -35,6 +36,7 @@ const Index: React.FC = () => {
         <Hero />
         <Features />
         <Demo />
+        <Plan />
       </main>
       <Footer />
     </div>

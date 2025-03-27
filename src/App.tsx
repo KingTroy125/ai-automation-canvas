@@ -16,7 +16,6 @@ import AIAgents from "./pages/AIAgents";
 import WorkflowAutomation from "./pages/WorkflowAutomation";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
-import MonthlyPlan from "./pages/MonthlyPlan";
 
 const queryClient = new QueryClient();
 
@@ -42,7 +41,6 @@ const App = () => (
           {/* Account Routes */}
           <Route path="/dashboard/profile" element={<Profile />} />
           <Route path="/dashboard/settings" element={<Settings />} />
-          <Route path="/dashboard/plans" element={<MonthlyPlan />} />
           
           {/* Redirect /dashboard/* routes to the main dashboard for any undefined routes */}
           <Route path="/dashboard/*" element={<Navigate to="/dashboard" replace />} />
