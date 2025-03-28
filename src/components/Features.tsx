@@ -1,6 +1,6 @@
-
 import React, { useEffect, useRef } from 'react';
 import GlassMorphism from './ui/GlassMorphism';
+import AnimatedGradient from './ui/AnimatedGradient';
 import { 
   Code, 
   FileUp, 
@@ -106,7 +106,13 @@ const Features: React.FC = () => {
 
   return (
     <section id="features" className="py-20 px-4 relative overflow-hidden" ref={featuresRef}>
-      {/* Background Elements */}
+      {/* Background gradient (added from Hero component) */}
+      <AnimatedGradient 
+        className="absolute top-0 left-0 right-0 bottom-0 opacity-20" 
+        colors={['#8B5CF6', '#EC4899', '#3B82F6']}
+      />
+      
+      {/* Previous background elements - you can keep or remove these */}
       <div className="absolute top-0 right-0 w-80 h-80 bg-primary/5 rounded-full blur-3xl" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
       

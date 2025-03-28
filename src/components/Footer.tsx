@@ -1,7 +1,7 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import GlassMorphism from './ui/GlassMorphism';
+import AnimatedGradient from './ui/AnimatedGradient';
 import { ArrowRight, Github, Twitter, Linkedin } from 'lucide-react';
 import { Button } from './ui/button';
 
@@ -39,8 +39,14 @@ const Footer: React.FC = () => {
   ];
 
   return (
-    <footer className="py-16 px-4 relative">
-      <div className="container mx-auto">
+    <footer className="py-16 px-4 relative overflow-hidden">
+      {/* Background gradient */}
+      <AnimatedGradient 
+        className="absolute top-0 left-0 right-0 bottom-0 opacity-20" 
+        colors={['#8B5CF6', '#EC4899', '#3B82F6']}
+      />
+      
+      <div className="container mx-auto relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
           <div className="lg:col-span-2">
             <div className="mb-4">
@@ -51,7 +57,7 @@ const Footer: React.FC = () => {
               coding and automation platform.
             </p>
             
-            <GlassMorphism className="p-6 mb-8 max-w-md">
+            <GlassMorphism className="p-6 mb-8 max-w-md" intensity="medium">
               <h3 className="text-sm font-medium mb-3">Stay up to date</h3>
               <div className="flex gap-2">
                 <input 
@@ -66,22 +72,30 @@ const Footer: React.FC = () => {
             </GlassMorphism>
             
             <div className="flex space-x-4">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Github className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Twitter className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Linkedin className="h-5 w-5" />
-              </a>
+              <GlassMorphism className="p-2 rounded-full" intensity="light">
+                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                  <Github className="h-5 w-5" />
+                </a>
+              </GlassMorphism>
+              <GlassMorphism className="p-2 rounded-full" intensity="light">
+                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                  <Twitter className="h-5 w-5" />
+                </a>
+              </GlassMorphism>
+              <GlassMorphism className="p-2 rounded-full" intensity="light">
+                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                  <Linkedin className="h-5 w-5" />
+                </a>
+              </GlassMorphism>
             </div>
           </div>
           
           <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-10">
             {footerLinks.map((category, idx) => (
               <div key={idx}>
-                <h3 className="font-medium mb-4">{category.title}</h3>
+                <GlassMorphism className="inline-block px-3 py-1 rounded-md mb-4" intensity="light">
+                  <h3 className="font-medium">{category.title}</h3>
+                </GlassMorphism>
                 <ul className="space-y-3">
                   {category.links.map((link, linkIdx) => (
                     <li key={linkIdx}>

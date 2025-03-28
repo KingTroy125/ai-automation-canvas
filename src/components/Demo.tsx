@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import GlassMorphism from './ui/GlassMorphism';
+import AnimatedGradient from './ui/AnimatedGradient';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Code, FileText, Bot, Workflow,
@@ -206,8 +207,14 @@ function App() {
   };
 
   return (
-    <section id="demo" className="py-20 px-4 bg-secondary/50" ref={demoRef}>
-      <div className="container mx-auto">
+    <section id="demo" className="py-20 px-4 relative overflow-hidden" ref={demoRef}>
+      {/* Background gradient */}
+      <AnimatedGradient 
+        className="absolute top-0 left-0 right-0 bottom-0 opacity-20" 
+        colors={['#8B5CF6', '#EC4899', '#3B82F6']}
+      />
+      
+      <div className="container mx-auto relative z-10">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 animate-on-scroll opacity-0">
             See It In <span className="text-gradient">Action</span>
@@ -218,16 +225,18 @@ function App() {
         </div>
         
         <div className="max-w-4xl mx-auto animate-on-scroll opacity-0 animate-delay-300">
-          <GlassMorphism className="p-6">
+          <GlassMorphism className="p-6" intensity="medium">
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold flex items-center gap-2">
                   {demoSteps[currentStep].icon}
                   {demoSteps[currentStep].title}
                 </h3>
-                <div className="text-sm text-muted-foreground">
-                  Step {currentStep + 1} of {demoSteps.length}
-                </div>
+                <GlassMorphism className="px-3 py-1 rounded-full" intensity="light">
+                  <div className="text-sm text-muted-foreground">
+                    Step {currentStep + 1} of {demoSteps.length}
+                  </div>
+                </GlassMorphism>
               </div>
               <p className="text-muted-foreground">{demoSteps[currentStep].description}</p>
             </div>
