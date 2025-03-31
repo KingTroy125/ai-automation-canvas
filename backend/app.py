@@ -4,6 +4,8 @@ import os
 from dotenv import load_dotenv
 import traceback
 import sys
+import ssl
+import certifi
 
 # Fix for cgi module in Python 3.13
 if sys.version_info >= (3, 13):
@@ -25,6 +27,14 @@ try:
     httpx.HTTPTransport.__init__ = patched_init
 except Exception as e:
     print(f"Warning: Could not patch HTTPTransport: {e}")
+
+# Patch to handle SSL issues
+try:
+    # Create SSL context with proper verification
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+except Exception as e:
+    print(f"Warning: Could not create SSL context: {e}")
+    ssl_context = None
 
 # Load environment variables
 load_dotenv()
@@ -115,6 +125,340 @@ def toggle_claude():
     status = "DOWN" if SIMULATE_CLAUDE_DOWN else "UP"
     return jsonify({"status": f"Claude simulation is now {status}"})
 
+@app.route('/code-generate', methods=['POST'])
+def code_generate():
+    try:
+        data = request.get_json()
+        if not data or 'prompt' not in data:
+            return jsonify({"error": "Missing prompt in request"}), 400
+        
+        prompt = data['prompt']
+        requested_model = data.get('model', 'auto')
+        language = data.get('language', '')
+        
+        # Construct a prompt that ensures only code is returned
+        if language:
+            code_prompt = f"Generate ONLY code in {language} for the following task: {prompt}. Return ONLY the code without any explanations, comments, or markdown formatting."
+        else:
+            code_prompt = f"Generate ONLY code for the following task: {prompt}. Return ONLY the code without any explanations, comments, or markdown formatting."
+        
+        # If requested model is OpenAI
+        if requested_model in OPENAI_MODELS.keys() and openai_api_key:
+            try:
+                # Try using the OpenAI client with SSL handling
+                try:
+                    from openai import OpenAI
+                    
+                    # Configure the client with proper SSL settings if needed
+                    client_kwargs = {"api_key": openai_api_key}
+                    
+                    # Create a custom httpx client with proper SSL settings if needed
+                    try:
+                        import httpx
+                        http_client = httpx.Client(
+                            timeout=60.0,
+                            verify=certifi.where()  # Use proper SSL certificate verification
+                        )
+                        client_kwargs["http_client"] = http_client
+                    except Exception as http_error:
+                        print(f"Warning: Could not create custom HTTP client: {http_error}")
+                    
+                    client = OpenAI(**client_kwargs)
+                    
+                    response = client.chat.completions.create(
+                        model=requested_model,
+                        messages=[
+                            {"role": "system", "content": "You are a code-only assistant. You must only return code without explanations or markdown formatting."},
+                            {"role": "user", "content": code_prompt}
+                        ],
+                        max_tokens=2000
+                    )
+                    return jsonify({
+                        "code": response.choices[0].message.content.strip(),
+                        "model": requested_model
+                    })
+                except Exception as openai_import_error:
+                    print(f"Error with OpenAI client: {str(openai_import_error)}")
+                    
+                    # Fall back to direct API call if client doesn't work
+                    import httpx
+                    
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {openai_api_key}"
+                    }
+                    
+                    payload = {
+                        "model": requested_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a code-only assistant. You must only return code without explanations or markdown formatting."},
+                            {"role": "user", "content": code_prompt}
+                        ],
+                        "max_tokens": 2000
+                    }
+                    
+                    # Use httpx with proper SSL context
+                    api_response = httpx.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=60.0,
+                        verify=certifi.where()  # Use proper certificate verification
+                    )
+                    
+                    if api_response.status_code == 200:
+                        response_json = api_response.json()
+                        response_text = response_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        
+                        return jsonify({
+                            "code": response_text,
+                            "model": requested_model
+                        })
+                    else:
+                        raise Exception(f"OpenAI API call failed: {api_response.status_code} - {api_response.text}")
+            except Exception as e:
+                print(f"OpenAI API error: {str(e)}")
+                print(traceback.format_exc())
+                raise
+        
+        # If user specifically requests a Claude model or it's set to auto and Claude is available
+        is_claude_request = requested_model in CLAUDE_MODELS.keys() or requested_model == 'auto'
+        if is_claude_request and anthropic_api_key and not SIMULATE_CLAUDE_DOWN:
+            try:
+                import anthropic
+                
+                # Determine which Claude model to use
+                claude_model = requested_model if requested_model in CLAUDE_MODELS.keys() else DEFAULT_CLAUDE_MODEL
+                
+                try:
+                    # Create Anthropic client with proper SSL settings
+                    client_kwargs = {"api_key": anthropic_api_key}
+                    
+                    # Create a custom httpx client with proper SSL settings
+                    try:
+                        import httpx
+                        http_client = httpx.Client(
+                            timeout=60.0,
+                            verify=certifi.where()  # Use proper SSL certificate verification
+                        )
+                        client_kwargs["http_client"] = http_client
+                    except Exception as http_error:
+                        print(f"Warning: Could not create custom HTTP client: {http_error}")
+                    
+                    client = anthropic.Anthropic(**client_kwargs)
+                    
+                    try:
+                        response = client.messages.create(
+                            model=claude_model,
+                            max_tokens=2000,
+                            messages=[
+                                {"role": "user", "content": code_prompt}
+                            ],
+                            system="You are a code-only assistant. You must only return code without explanations or markdown formatting."
+                        )
+                    except TypeError as te:
+                        if 'socket_options' in str(te):
+                            import httpx
+                            http_client = httpx.Client(
+                                timeout=60.0,
+                                verify=certifi.where()  # Use proper certificate verification
+                            )
+                            client = anthropic.Anthropic(
+                                api_key=anthropic_api_key,
+                                http_client=http_client
+                            )
+                            response = client.messages.create(
+                                model=claude_model,
+                                max_tokens=2000,
+                                messages=[
+                                    {"role": "user", "content": code_prompt}
+                                ],
+                                system="You are a code-only assistant. You must only return code without explanations or markdown formatting."
+                            )
+                        else:
+                            raise
+                    
+                    # Extract the content and clean up markdown code blocks if present
+                    if hasattr(response, 'content') and isinstance(response.content, list):
+                        response_text = response.content[0].text.strip()
+                    else:
+                        response_text = str(response.content).strip()
+                    
+                    # Remove markdown code blocks if present
+                    if response_text.startswith("```") and response_text.endswith("```"):
+                        # Extract language if specified
+                        first_line_end = response_text.find("\n")
+                        if first_line_end > 0:
+                            language_line = response_text[3:first_line_end].strip()
+                            if language_line:  # There's a language specification
+                                response_text = response_text[first_line_end+1:-3].strip()
+                            else:
+                                response_text = response_text[3:-3].strip()
+                        else:
+                            response_text = response_text[3:-3].strip()
+                    
+                    return jsonify({
+                        "code": response_text,
+                        "model": claude_model
+                    })
+                except Exception as e:
+                    print(f"Error with Anthropic client: {str(e)}")
+                    print(traceback.format_exc())
+                    
+                    # Fall back to direct API call if client doesn't work
+                    import httpx
+                    
+                    headers = {
+                        "Content-Type": "application/json",
+                        "X-Api-Key": anthropic_api_key,
+                        "anthropic-version": "2023-06-01"
+                    }
+                    
+                    payload = {
+                        "model": claude_model,
+                        "max_tokens": 2000,
+                        "messages": [{"role": "user", "content": code_prompt}],
+                        "system": "You are a code-only assistant. You must only return code without explanations or markdown formatting."
+                    }
+                    
+                    # Use httpx with proper SSL context
+                    api_response = httpx.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers=headers,
+                        json=payload,
+                        timeout=60.0,
+                        verify=certifi.where()  # Use proper certificate verification
+                    )
+                    
+                    if api_response.status_code == 200:
+                        response_json = api_response.json()
+                        response_text = response_json.get("content", [{"text": ""}])[0]["text"].strip()
+                        
+                        # Remove markdown code blocks if present
+                        if response_text.startswith("```") and response_text.endswith("```"):
+                            # Extract language if specified
+                            first_line_end = response_text.find("\n")
+                            if first_line_end > 0:
+                                language_line = response_text[3:first_line_end].strip()
+                                if language_line:  # There's a language specification
+                                    response_text = response_text[first_line_end+1:-3].strip()
+                                else:
+                                    response_text = response_text[3:-3].strip()
+                            else:
+                                response_text = response_text[3:-3].strip()
+                        
+                        return jsonify({
+                            "code": response_text,
+                            "model": claude_model
+                        })
+                    else:
+                        raise Exception(f"API call failed: {api_response.status_code} - {api_response.text}")
+                    
+            except Exception as e:
+                print(f"Claude API error: {str(e)}")
+                print(traceback.format_exc())
+                if requested_model == 'auto' and openai_api_key:
+                    pass  # Continue to OpenAI fallback
+                else:
+                    raise
+        
+        # Fall back to OpenAI if in auto mode
+        if requested_model == 'auto' and openai_api_key:
+            fallback_model = next(iter(OPENAI_MODELS.keys()), "gpt-3.5-turbo")
+            try:
+                # Try using the OpenAI client with SSL handling
+                try:
+                    from openai import OpenAI
+                    
+                    # Configure the client with proper SSL settings if needed
+                    client_kwargs = {"api_key": openai_api_key}
+                    
+                    # Create a custom httpx client with proper SSL settings if needed
+                    try:
+                        import httpx
+                        http_client = httpx.Client(
+                            timeout=60.0,
+                            verify=certifi.where()  # Use proper SSL certificate verification
+                        )
+                        client_kwargs["http_client"] = http_client
+                    except Exception as http_error:
+                        print(f"Warning: Could not create custom HTTP client: {http_error}")
+                    
+                    client = OpenAI(**client_kwargs)
+                    
+                    response = client.chat.completions.create(
+                        model=fallback_model,
+                        messages=[
+                            {"role": "system", "content": "You are a code-only assistant. You must only return code without explanations or markdown formatting."},
+                            {"role": "user", "content": code_prompt}
+                        ],
+                        max_tokens=2000
+                    )
+                    return jsonify({
+                        "code": response.choices[0].message.content.strip(),
+                        "model": fallback_model
+                    })
+                except Exception as openai_import_error:
+                    print(f"Error with OpenAI client: {str(openai_import_error)}")
+                    
+                    # Fall back to direct API call if client doesn't work
+                    import httpx
+                    
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {openai_api_key}"
+                    }
+                    
+                    payload = {
+                        "model": fallback_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a code-only assistant. You must only return code without explanations or markdown formatting."},
+                            {"role": "user", "content": code_prompt}
+                        ],
+                        "max_tokens": 2000
+                    }
+                    
+                    # Use httpx with proper SSL context
+                    api_response = httpx.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=60.0,
+                        verify=certifi.where()  # Use proper certificate verification
+                    )
+                    
+                    if api_response.status_code == 200:
+                        response_json = api_response.json()
+                        response_text = response_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        
+                        return jsonify({
+                            "code": response_text,
+                            "model": fallback_model
+                        })
+                    else:
+                        raise Exception(f"OpenAI API call failed: {api_response.status_code} - {api_response.text}")
+            except Exception as e:
+                print(f"OpenAI API error: {str(e)}")
+                print(traceback.format_exc())
+                raise
+        
+        # If we get here, no suitable model was found
+        return jsonify({
+            "code": "# No model available to generate code",
+            "model": "mock"
+        }), 503
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Error in code generation endpoint: {error_msg}")
+        print(traceback.format_exc())
+        
+        return jsonify({
+            "code": "# Error: " + str(e),
+            "error": error_msg,
+            "model": "error"
+        }), 500
+
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
@@ -178,13 +522,14 @@ def chat():
                     try:
                         response = client.messages.create(
                             model=claude_model,
-                            max_tokens=1000,
-                            messages=[{"role": "user", "content": message_content}]
+                            max_tokens=2000,
+                            messages=[
+                                {"role": "user", "content": message_content}
+                            ],
+                            system="You are a code-only assistant. You must only return code without explanations or markdown formatting."
                         )
                     except TypeError as te:
                         if 'socket_options' in str(te):
-                            # If using a direct client fails with socket_options error, 
-                            # try to use a custom httpx client without socket_options
                             import httpx
                             http_client = httpx.Client(timeout=None)
                             client = anthropic.Anthropic(
@@ -193,18 +538,33 @@ def chat():
                             )
                             response = client.messages.create(
                                 model=claude_model,
-                                max_tokens=1000,
-                                messages=[{"role": "user", "content": message_content}]
+                                max_tokens=2000,
+                                messages=[
+                                    {"role": "user", "content": message_content}
+                                ],
+                                system="You are a code-only assistant. You must only return code without explanations or markdown formatting."
                             )
                         else:
                             raise
                     
-                    # Extract response content based on SDK version
+                    # Extract the content and clean up markdown code blocks if present
                     if hasattr(response, 'content') and isinstance(response.content, list):
-                        response_text = response.content[0].text
+                        response_text = response.content[0].text.strip()
                     else:
-                        # Fallback for other response formats
-                        response_text = str(response.content)
+                        response_text = str(response.content).strip()
+                    
+                    # Remove markdown code blocks if present
+                    if response_text.startswith("```") and response_text.endswith("```"):
+                        # Extract language if specified
+                        first_line_end = response_text.find("\n")
+                        if first_line_end > 0:
+                            language_line = response_text[3:first_line_end].strip()
+                            if language_line:  # There's a language specification
+                                response_text = response_text[first_line_end+1:-3].strip()
+                            else:
+                                response_text = response_text[3:-3].strip()
+                        else:
+                            response_text = response_text[3:-3].strip()
                     
                     return jsonify({
                         "response": response_text,
@@ -225,8 +585,9 @@ def chat():
                     
                     payload = {
                         "model": claude_model,
-                        "max_tokens": 1000,
-                        "messages": [{"role": "user", "content": message_content}]
+                        "max_tokens": 2000,
+                        "messages": [{"role": "user", "content": message_content}],
+                        "system": "You are a code-only assistant. You must only return code without explanations or markdown formatting."
                     }
                     
                     api_response = httpx.post(
@@ -238,7 +599,20 @@ def chat():
                     
                     if api_response.status_code == 200:
                         response_json = api_response.json()
-                        response_text = response_json.get("content", [{"text": "No response text"}])[0]["text"]
+                        response_text = response_json.get("content", [{"text": ""}])[0]["text"].strip()
+                        
+                        # Remove markdown code blocks if present
+                        if response_text.startswith("```") and response_text.endswith("```"):
+                            # Extract language if specified
+                            first_line_end = response_text.find("\n")
+                            if first_line_end > 0:
+                                language_line = response_text[3:first_line_end].strip()
+                                if language_line:  # There's a language specification
+                                    response_text = response_text[first_line_end+1:-3].strip()
+                                else:
+                                    response_text = response_text[3:-3].strip()
+                            else:
+                                response_text = response_text[3:-3].strip()
                         
                         return jsonify({
                             "response": response_text,

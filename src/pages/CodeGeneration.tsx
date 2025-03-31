@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,8 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Code, Copy, Wand2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { Code, Copy, Wand2, Settings2, Download, ClipboardCopy } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+
+interface Model {
+  id: string;
+  name: string;
+  provider: string;
+}
 
 const CodeGeneration: React.FC = () => {
   const [prompt, setPrompt] = useState('');
@@ -16,27 +24,247 @@ const CodeGeneration: React.FC = () => {
   const [framework, setFramework] = useState('react');
   const [generatedCode, setGeneratedCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>('auto');
+  const [availableModels, setAvailableModels] = useState<Model[]>([
+    { id: 'auto', name: 'Auto (Default)', provider: 'auto' }
+  ]);
+  const [usedModel, setUsedModel] = useState<string>('');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [includeComments, setIncludeComments] = useState(false);
+  const [codeLength, setCodeLength] = useState(1); // 1 = Normal, 0 = Concise, 2 = Detailed
 
-  const handleGenerate = () => {
+  // Fetch available models on component mount
+  useEffect(() => {
+    const fetchAvailableModels = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/models');
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableModels([
+            { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
+            ...data.models
+          ]);
+        } else {
+          // Fall back to verify-key endpoint
+          const fallbackResponse = await fetch('http://localhost:8000/verify-key');
+          if (fallbackResponse.ok) {
+            const data = await fallbackResponse.json();
+            const formattedModels = data.available_models.map((id: string) => {
+              if (id === 'claude-3-sonnet-20240229') {
+                return { id, name: 'Claude 3 Sonnet', provider: 'anthropic' };
+              } else if (id === 'claude-3-5-sonnet-20240620') {
+                return { id, name: 'Claude 3.5 Sonnet', provider: 'anthropic' };
+              } else if (id === 'gpt-4') {
+                return { id, name: 'GPT-4', provider: 'openai' };
+              } else if (id === 'gpt-4-turbo') {
+                return { id, name: 'GPT-4 Turbo', provider: 'openai' };
+              } else if (id === 'gpt-3.5-turbo') {
+                return { id, name: 'GPT-3.5 Turbo', provider: 'openai' };
+              } else {
+                return { id, name: id, provider: 'unknown' };
+              }
+            });
+            
+            setAvailableModels([
+              { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
+              ...formattedModels
+            ]);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching available models:', error);
+        toast({
+          title: "Connection Error",
+          description: "Could not connect to AI service. Check if the backend is running.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchAvailableModels();
+  }, []);
+
+  const getFrameworkOptions = (lang: string) => {
+    switch(lang) {
+      case 'javascript':
+      case 'typescript':
+        return [
+          { value: 'react', label: 'React' },
+          { value: 'vue', label: 'Vue' },
+          { value: 'angular', label: 'Angular' },
+          { value: 'svelte', label: 'Svelte' },
+          { value: 'nextjs', label: 'Next.js' },
+          { value: 'none', label: 'None (Vanilla)' }
+        ];
+      case 'html':
+        return [
+          { value: 'bootstrap', label: 'Bootstrap' },
+          { value: 'tailwind', label: 'Tailwind CSS' },
+          { value: 'none', label: 'None (Vanilla)' }
+        ];
+      case 'css':
+        return [
+          { value: 'tailwind', label: 'Tailwind CSS' },
+          { value: 'sass', label: 'SASS/SCSS' },
+          { value: 'none', label: 'None (Vanilla)' }
+        ];
+      case 'python':
+        return [
+          { value: 'django', label: 'Django' },
+          { value: 'flask', label: 'Flask' },
+          { value: 'fastapi', label: 'FastAPI' },
+          { value: 'none', label: 'None (Vanilla)' }
+        ];
+      case 'java':
+        return [
+          { value: 'spring', label: 'Spring' },
+          { value: 'none', label: 'None (Vanilla)' }
+        ];
+      case 'csharp':
+        return [
+          { value: 'aspnet', label: 'ASP.NET' },
+          { value: 'none', label: 'None (Vanilla)' }
+        ];
+      default:
+        return [
+          { value: 'none', label: 'None' }
+        ];
+    }
+  };
+
+  // Update framework when language changes
+  useEffect(() => {
+    const frameworkOptions = getFrameworkOptions(language);
+    if (!frameworkOptions.find(option => option.value === framework)) {
+      setFramework(frameworkOptions[0].value);
+    }
+  }, [language]);
+
+  const handleGenerate = async () => {
     if (!prompt.trim()) {
-      toast.error('Please enter a prompt first');
+      toast({
+        title: "Error",
+        description: "Please enter a prompt first",
+        variant: "destructive"
+      });
       return;
     }
     
     setIsLoading(true);
     
-    // Simulate code generation
-    setTimeout(() => {
-      const code = generateSampleCode(language, framework, prompt);
-      setGeneratedCode(code);
+    try {
+      // Prepare the prompt with framework if selected
+      let fullPrompt = prompt;
+      
+      if (framework && framework !== 'none') {
+        fullPrompt += ` using ${framework} framework`;
+      }
+      
+      // Add style preferences based on advanced options
+      if (showAdvancedOptions) {
+        if (includeComments) {
+          fullPrompt += ". Include helpful comments in the code";
+        } else {
+          fullPrompt += ". Minimize comments in the code";
+        }
+        
+        if (codeLength === 0) {
+          fullPrompt += ". Make the code as concise as possible";
+        } else if (codeLength === 2) {
+          fullPrompt += ". Provide a more detailed implementation";
+        }
+      }
+      
+      // Call the backend API to generate code
+      const response = await fetch('http://localhost:8000/code-generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: fullPrompt,
+          model: selectedModel,
+          language: language
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setGeneratedCode(data.code);
+      setUsedModel(data.model);
+      
+      toast({
+        title: "Success",
+        description: `Code generated successfully using ${getModelDisplayName(data.model)}`,
+      });
+    } catch (error) {
+      console.error('Error generating code:', error);
+      toast({
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate code",
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-      toast.success('Code generated successfully');
-    }, 1500);
+    }
+  };
+  
+  const getModelDisplayName = (modelId: string) => {
+    const model = availableModels.find(m => m.id === modelId);
+    if (model) return model.name;
+    
+    // Fallback names
+    if (modelId.includes('claude-3-5')) return 'Claude 3.5 Sonnet';
+    if (modelId.includes('claude-3')) return 'Claude 3 Sonnet';
+    if (modelId.includes('gpt-4-turbo')) return 'GPT-4 Turbo';
+    if (modelId.includes('gpt-4')) return 'GPT-4';
+    if (modelId.includes('gpt-3.5')) return 'GPT-3.5 Turbo';
+    
+    return modelId;
   };
   
   const copyToClipboard = () => {
     navigator.clipboard.writeText(generatedCode);
-    toast.success('Code copied to clipboard');
+    toast({
+      title: "Copied",
+      description: "Code copied to clipboard"
+    });
+  };
+
+  const downloadCode = () => {
+    const extensions: Record<string, string> = {
+      javascript: 'js',
+      typescript: 'ts',
+      python: 'py',
+      java: 'java',
+      csharp: 'cs',
+      html: 'html',
+      css: 'css'
+    };
+    
+    const extension = extensions[language] || 'txt';
+    const fileName = `generated_code.${extension}`;
+    
+    const blob = new Blob([generatedCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Clean up
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Downloaded",
+      description: `Code saved as ${fileName}`
+    });
   };
   
   return (
@@ -76,6 +304,8 @@ const CodeGeneration: React.FC = () => {
                         <SelectItem value="python">Python</SelectItem>
                         <SelectItem value="java">Java</SelectItem>
                         <SelectItem value="csharp">C#</SelectItem>
+                        <SelectItem value="html">HTML</SelectItem>
+                        <SelectItem value="css">CSS</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -87,15 +317,107 @@ const CodeGeneration: React.FC = () => {
                         <SelectValue placeholder="Select framework" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="react">React</SelectItem>
-                        <SelectItem value="vue">Vue</SelectItem>
-                        <SelectItem value="angular">Angular</SelectItem>
-                        <SelectItem value="svelte">Svelte</SelectItem>
-                        <SelectItem value="none">None</SelectItem>
+                        {getFrameworkOptions(language).map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-2 block">AI Model</label>
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select AI model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto (Default)</SelectItem>
+                      
+                      {availableModels.filter(m => m.provider === 'anthropic' && m.id !== 'auto').length > 0 && (
+                        <SelectItem value="divider-anthropic" disabled>
+                          --- Anthropic ---
+                        </SelectItem>
+                      )}
+                      
+                      {availableModels
+                        .filter(model => model.provider === 'anthropic' && model.id !== 'auto')
+                        .map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.name}
+                          </SelectItem>
+                        ))}
+                      
+                      {availableModels.filter(m => m.provider === 'openai').length > 0 && (
+                        <SelectItem value="divider-openai" disabled>
+                          --- OpenAI ---
+                        </SelectItem>
+                      )}
+                      
+                      {availableModels
+                        .filter(model => model.provider === 'openai')
+                        .map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                    className="flex items-center gap-1"
+                  >
+                    <Settings2 className="h-4 w-4" />
+                    {showAdvancedOptions ? 'Hide' : 'Show'} Advanced Options
+                  </Button>
+                </div>
+                
+                {showAdvancedOptions && (
+                  <div className="space-y-4 p-4 bg-secondary/20 rounded-md">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="comments">Include Comments</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Add explanatory comments to the generated code
+                        </p>
+                      </div>
+                      <Switch
+                        id="comments"
+                        checked={includeComments}
+                        onCheckedChange={setIncludeComments}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <Label htmlFor="code-length">Code Length</Label>
+                        <span className="text-xs text-muted-foreground">
+                          {codeLength === 0 ? 'Concise' : codeLength === 1 ? 'Normal' : 'Detailed'}
+                        </span>
+                      </div>
+                      <Slider
+                        id="code-length"
+                        min={0}
+                        max={2}
+                        step={1}
+                        value={[codeLength]}
+                        onValueChange={(value) => setCodeLength(value[0])}
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Concise</span>
+                        <span>Normal</span>
+                        <span>Detailed</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <Button 
                   onClick={handleGenerate} 
@@ -113,12 +435,23 @@ const CodeGeneration: React.FC = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Generated Code</h3>
-                {generatedCode && (
-                  <Button variant="ghost" size="sm" onClick={copyToClipboard}>
-                    <Copy className="h-4 w-4 mr-1" />
-                    Copy
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {usedModel && (
+                    <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
+                      {getModelDisplayName(usedModel)}
+                    </span>
+                  )}
+                  {generatedCode && (
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={downloadCode} title="Download code">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={copyToClipboard} title="Copy to clipboard">
+                        <ClipboardCopy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="relative bg-zinc-950 rounded-md overflow-hidden">
                 {generatedCode ? (
@@ -139,751 +472,5 @@ const CodeGeneration: React.FC = () => {
     </DashboardLayout>
   );
 };
-
-// Helper function to generate sample code based on user input
-function generateSampleCode(language: string, framework: string, prompt: string): string {
-  if (language === 'javascript' || language === 'typescript') {
-    if (framework === 'react') {
-      return `import React, { useState } from 'react';
-
-const Button = ({ children, onClick, variant = 'primary', isLoading = false }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  
-  const baseClasses = 'px-4 py-2 rounded font-medium transition-all duration-200';
-  const variantClasses = {
-    primary: 'bg-blue-600 hover:bg-blue-700 text-white',
-    secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800',
-    danger: 'bg-red-600 hover:bg-red-700 text-white',
-  };
-  
-  return (
-    <button
-      className={\`\${baseClasses} \${variantClasses[variant]} \${isLoading ? 'opacity-70 cursor-not-allowed' : ''}\`}
-      onClick={isLoading ? undefined : onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      disabled={isLoading}
-    >
-      {isLoading ? (
-        <div className="flex items-center">
-          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Loading...
-        </div>
-      ) : (
-        children
-      )}
-    </button>
-  );
-};
-
-export default Button;`;
-    } else if (framework === 'vue') {
-      return `<template>
-  <button 
-    :class="[
-      'button', 
-      \`button--\${variant}\`, 
-      { 'button--loading': isLoading }
-    ]"
-    :disabled="isLoading"
-    @click="isLoading ? undefined : onClick"
-  >
-    <span v-if="isLoading" class="button__loader">
-      <svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      Loading...
-    </span>
-    <slot v-else></slot>
-  </button>
-</template>
-
-<script>
-export default {
-  name: 'AppButton',
-  props: {
-    variant: {
-      type: String,
-      default: 'primary',
-      validator: value => ['primary', 'secondary', 'danger'].includes(value)
-    },
-    isLoading: {
-      type: Boolean,
-      default: false
-    }
-  },
-  methods: {
-    onClick() {
-      this.$emit('click');
-    }
-  }
-}
-</script>
-
-<style scoped>
-.button {
-  padding: 0.5rem 1rem;
-  border-radius: 0.25rem;
-  font-weight: 500;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.button--primary {
-  background-color: #2563eb;
-  color: white;
-}
-
-.button--primary:hover:not(:disabled) {
-  background-color: #1d4ed8;
-}
-
-.button--secondary {
-  background-color: #e5e7eb;
-  color: #1f2937;
-}
-
-.button--secondary:hover:not(:disabled) {
-  background-color: #d1d5db;
-}
-
-.button--danger {
-  background-color: #dc2626;
-  color: white;
-}
-
-.button--danger:hover:not(:disabled) {
-  background-color: #b91c1c;
-}
-
-.button--loading {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.button__loader {
-  display: flex;
-  align-items: center;
-}
-</style>`;
-    } else {
-      return `// A vanilla JavaScript button with hover effects and loading state
-
-class Button {
-  constructor(selector, options = {}) {
-    this.element = document.querySelector(selector);
-    if (!this.element) throw new Error(\`Button element "\${selector}" not found\`);
-    
-    this.options = {
-      variant: 'primary',
-      loadingText: 'Loading...',
-      ...options
-    };
-    
-    this.isLoading = false;
-    this.originalText = this.element.textContent;
-    this.init();
-  }
-  
-  init() {
-    // Add base styling
-    this.element.classList.add('button');
-    this.element.classList.add(\`button--\${this.options.variant}\`);
-    
-    // Add event listeners
-    this.element.addEventListener('mouseenter', this.handleMouseEnter.bind(this));
-    this.element.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
-    this.element.addEventListener('click', this.handleClick.bind(this));
-  }
-  
-  handleMouseEnter() {
-    if (this.isLoading) return;
-    this.element.classList.add('button--hovered');
-  }
-  
-  handleMouseLeave() {
-    this.element.classList.remove('button--hovered');
-  }
-  
-  handleClick(event) {
-    if (this.isLoading) {
-      event.preventDefault();
-      return;
-    }
-    
-    if (this.options.onClick) {
-      this.options.onClick(event);
-    }
-  }
-  
-  setLoading(isLoading) {
-    this.isLoading = isLoading;
-    
-    if (isLoading) {
-      this.element.classList.add('button--loading');
-      this.element.setAttribute('disabled', 'disabled');
-      this.element.innerHTML = \`
-        <svg class="button__spinner" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <circle class="spinner__background" cx="12" cy="12" r="10" />
-          <circle class="spinner__foreground" cx="12" cy="12" r="10" />
-        </svg>
-        \${this.options.loadingText}
-      \`;
-    } else {
-      this.element.classList.remove('button--loading');
-      this.element.removeAttribute('disabled');
-      this.element.textContent = this.originalText;
-    }
-  }
-}
-
-// CSS to add to your stylesheet
-const styles = \`
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  border-radius: 0.25rem;
-  font-weight: 500;
-  transition: all 0.2s;
-  cursor: pointer;
-}
-
-.button--primary {
-  background-color: #2563eb;
-  color: white;
-}
-
-.button--primary.button--hovered {
-  background-color: #1d4ed8;
-}
-
-.button--secondary {
-  background-color: #e5e7eb;
-  color: #1f2937;
-}
-
-.button--secondary.button--hovered {
-  background-color: #d1d5db;
-}
-
-.button--danger {
-  background-color: #dc2626;
-  color: white;
-}
-
-.button--danger.button--hovered {
-  background-color: #b91c1c;
-}
-
-.button--loading {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.button__spinner {
-  width: 1rem;
-  height: 1rem;
-  margin-right: 0.5rem;
-  animation: spin 1s linear infinite;
-}
-
-.spinner__background {
-  fill: none;
-  stroke: currentColor;
-  opacity: 0.25;
-  stroke-width: 4;
-}
-
-.spinner__foreground {
-  fill: none;
-  stroke: currentColor;
-  opacity: 0.75;
-  stroke-width: 4;
-  stroke-dasharray: 60;
-  stroke-dashoffset: 45;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-\`;
-
-// Usage
-const button = new Button('#my-button', {
-  variant: 'primary',
-  loadingText: 'Processing...',
-  onClick: (event) => {
-    button.setLoading(true);
-    // Simulate async operation
-    setTimeout(() => {
-      button.setLoading(false);
-    }, 2000);
-  }
-});
-`;
-    }
-  } else if (language === 'python') {
-    return `# Python implementation based on the prompt: "${prompt}"
-
-class Button:
-    """A simple button class with state management."""
-    
-    def __init__(self, label, action=None, variant="primary"):
-        """
-        Initialize a new button.
-        
-        Args:
-            label (str): The text to display on the button.
-            action (callable, optional): Function to call when button is clicked.
-            variant (str): Button style - 'primary', 'secondary', or 'danger'.
-        """
-        self.label = label
-        self.action = action
-        self.variant = variant
-        self.is_loading = False
-        self.is_hovered = False
-        
-    def click(self):
-        """Handle button click."""
-        if self.is_loading:
-            print(f"Button '{self.label}' is currently loading...")
-            return
-            
-        print(f"Button '{self.label}' was clicked!")
-        if self.action:
-            return self.action()
-    
-    def set_loading(self, is_loading):
-        """Set the loading state of the button."""
-        self.is_loading = is_loading
-        state = "Loading..." if is_loading else "Ready"
-        print(f"Button '{self.label}' state: {state}")
-        
-    def hover(self, is_hovered):
-        """Handle hover state change."""
-        self.is_hovered = is_hovered
-        action = "entered" if is_hovered else "left"
-        print(f"Mouse {action} button '{self.label}'")
-        
-    def render(self):
-        """Render the button (text representation)."""
-        base = "[ "
-        
-        # Show loading spinner or label
-        if self.is_loading:
-            content = "● Loading..."
-        else:
-            content = self.label
-            
-        # Style based on variant
-        if self.variant == "primary":
-            style = "BLUE: "
-        elif self.variant == "secondary":
-            style = "GRAY: "
-        elif self.variant == "danger":
-            style = "RED: "
-        else:
-            style = ""
-            
-        # Add hover effect
-        if self.is_hovered and not self.is_loading:
-            style += "(hovered) "
-            
-        return base + style + content + " ]"
-
-
-# Example usage
-def example_action():
-    print("Performing example action...")
-    # Simulate async process
-    import time
-    time.sleep(1.5)
-    print("Action complete!")
-    
-# Create a button instance
-submit_button = Button("Submit", action=example_action, variant="primary")
-
-# Test button states
-print(submit_button.render())  # Initial state
-
-submit_button.hover(True)
-print(submit_button.render())  # Hovered state
-
-submit_button.set_loading(True)
-print(submit_button.render())  # Loading state
-
-# This won't call the action since button is loading
-submit_button.click()
-
-submit_button.set_loading(False)
-print(submit_button.render())  # Ready state
-
-# Now the action will execute
-submit_button.click()
-`;
-  } else if (language === 'java') {
-    return `import java.util.function.Consumer;
-
-/**
- * A Button class with hover effects and loading state
- */
-public class Button {
-    private String text;
-    private String variant;
-    private boolean isLoading;
-    private boolean isHovered;
-    private Runnable onClick;
-    
-    /**
-     * Constructs a new Button with the specified text and default styling.
-     * 
-     * @param text the button text
-     */
-    public Button(String text) {
-        this(text, "primary", null);
-    }
-    
-    /**
-     * Constructs a new Button with specified text and styling.
-     * 
-     * @param text the button text
-     * @param variant the button style variant (primary, secondary, danger)
-     * @param onClick the action to perform on click
-     */
-    public Button(String text, String variant, Runnable onClick) {
-        this.text = text;
-        this.variant = variant;
-        this.onClick = onClick;
-        this.isLoading = false;
-        this.isHovered = false;
-    }
-    
-    /**
-     * Sets the loading state of the button.
-     * 
-     * @param loading true if the button should show loading state
-     */
-    public void setLoading(boolean loading) {
-        this.isLoading = loading;
-        render(); // Refresh button appearance
-    }
-    
-    /**
-     * Updates hover state when mouse enters the button.
-     */
-    public void onMouseEnter() {
-        this.isHovered = true;
-        render(); // Refresh button appearance
-    }
-    
-    /**
-     * Updates hover state when mouse leaves the button.
-     */
-    public void onMouseLeave() {
-        this.isHovered = false;
-        render(); // Refresh button appearance
-    }
-    
-    /**
-     * Handles click events on the button.
-     */
-    public void click() {
-        if (isLoading) {
-            System.out.println("Button is loading, ignoring click");
-            return;
-        }
-        
-        System.out.println("Button clicked: " + text);
-        if (onClick != null) {
-            onClick.run();
-        }
-    }
-    
-    /**
-     * Renders the button by returning its string representation.
-     * (In a real UI framework, this would update the visual component)
-     */
-    public String render() {
-        StringBuilder sb = new StringBuilder();
-        
-        // Apply base style
-        sb.append("Button[");
-        
-        // Apply variant style
-        switch (variant) {
-            case "primary":
-                sb.append("Primary");
-                break;
-            case "secondary":
-                sb.append("Secondary");
-                break;
-            case "danger":
-                sb.append("Danger");
-                break;
-            default:
-                sb.append("Default");
-        }
-        
-        // Apply hover effect
-        if (isHovered && !isLoading) {
-            sb.append(":Hovered");
-        }
-        
-        sb.append("]: ");
-        
-        // Show loading state or text
-        if (isLoading) {
-            sb.append("Loading...");
-        } else {
-            sb.append(text);
-        }
-        
-        String rendered = sb.toString();
-        System.out.println(rendered);
-        return rendered;
-    }
-    
-    /**
-     * Example usage of the Button class.
-     */
-    public static void main(String[] args) {
-        // Create a button with click handler
-        Button submitButton = new Button("Submit", "primary", () -> {
-            System.out.println("Performing submit action...");
-            
-            // In a real app, we'd handle async operations properly
-            new Thread(() -> {
-                try {
-                    // Simulate some work
-                    Thread.sleep(2000);
-                    System.out.println("Submit action completed");
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }).start();
-        });
-        
-        // Render initial state
-        submitButton.render();
-        
-        // Test hover
-        submitButton.onMouseEnter();
-        
-        // Test loading state
-        submitButton.setLoading(true);
-        
-        // This click will be ignored
-        submitButton.click();
-        
-        // Done loading
-        submitButton.setLoading(false);
-        
-        // This click will work
-        submitButton.click();
-        
-        // Test mouse leave
-        submitButton.onMouseLeave();
-    }
-}
-`;
-  } else if (language === 'csharp') {
-    return `using System;
-using System.Threading.Tasks;
-
-namespace ButtonExample
-{
-    /// <summary>
-    /// A button component with hover effects and loading state.
-    /// </summary>
-    public class Button
-    {
-        private string _text;
-        private string _variant;
-        private bool _isLoading;
-        private bool _isHovered;
-        private Action _onClick;
-
-        /// <summary>
-        /// Gets the text displayed on the button.
-        /// </summary>
-        public string Text => _isLoading ? "Loading..." : _text;
-
-        /// <summary>
-        /// Gets or sets whether the button is in a loading state.
-        /// </summary>
-        public bool IsLoading
-        {
-            get => _isLoading;
-            set
-            {
-                _isLoading = value;
-                OnPropertyChanged(nameof(IsLoading));
-                OnPropertyChanged(nameof(Text));
-                OnPropertyChanged(nameof(IsEnabled));
-            }
-        }
-
-        /// <summary>
-        /// Gets whether the button is enabled.
-        /// </summary>
-        public bool IsEnabled => !_isLoading;
-
-        /// <summary>
-        /// Creates a new button with the specified text and default styling.
-        /// </summary>
-        /// <param name="text">The text to display on the button.</param>
-        public Button(string text) : this(text, "primary", null)
-        {
-        }
-
-        /// <summary>
-        /// Creates a new button with the specified text, styling, and click handler.
-        /// </summary>
-        /// <param name="text">The text to display on the button.</param>
-        /// <param name="variant">The style variant (primary, secondary, danger).</param>
-        /// <param name="onClick">The action to perform when clicked.</param>
-        public Button(string text, string variant, Action onClick)
-        {
-            _text = text ?? throw new ArgumentNullException(nameof(text));
-            _variant = variant ?? "primary";
-            _onClick = onClick;
-            _isLoading = false;
-            _isHovered = false;
-        }
-
-        /// <summary>
-        /// Handles mouse enter events.
-        /// </summary>
-        public void OnMouseEnter()
-        {
-            _isHovered = true;
-            OnPropertyChanged(nameof(IsHovered));
-        }
-
-        /// <summary>
-        /// Handles mouse leave events.
-        /// </summary>
-        public void OnMouseLeave()
-        {
-            _isHovered = false;
-            OnPropertyChanged(nameof(IsHovered));
-        }
-
-        /// <summary>
-        /// Gets whether the button is currently being hovered.
-        /// </summary>
-        public bool IsHovered => _isHovered;
-
-        /// <summary>
-        /// Handles click events.
-        /// </summary>
-        public void Click()
-        {
-            if (_isLoading)
-            {
-                Console.WriteLine("Button is in loading state. Click ignored.");
-                return;
-            }
-
-            Console.WriteLine($"Button '{_text}' clicked.");
-            _onClick?.Invoke();
-        }
-
-        /// <summary>
-        /// Begins an asynchronous operation when the button is clicked.
-        /// </summary>
-        /// <param name="asyncAction">The asynchronous operation to perform.</param>
-        public async Task ClickAsync(Func<Task> asyncAction)
-        {
-            if (_isLoading || asyncAction == null)
-                return;
-
-            try
-            {
-                IsLoading = true;
-                await asyncAction();
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        // In a real UI framework, this would update the UI
-        protected virtual void OnPropertyChanged(string propertyName)
-        {
-            Console.WriteLine($"Property changed: {propertyName}");
-        }
-
-        /// <summary>
-        /// Gets the CSS class names for the button based on its current state.
-        /// </summary>
-        public string GetCssClasses()
-        {
-            string baseClasses = "button";
-            
-            // Add variant
-            baseClasses += $" button--{_variant}";
-            
-            // Add loading state
-            if (_isLoading)
-            {
-                baseClasses += " button--loading";
-            }
-            
-            // Add hover state
-            if (_isHovered && !_isLoading)
-            {
-                baseClasses += " button--hover";
-            }
-            
-            return baseClasses;
-        }
-    }
-
-    class Program
-    {
-        static async Task Main(string[] args)
-        {
-            // Create a button
-            var button = new Button("Submit", "primary", () => 
-                Console.WriteLine("Button action executed!"));
-            
-            // Show initial state
-            Console.WriteLine($"Button created: {button.Text}");
-            Console.WriteLine($"CSS classes: {button.GetCssClasses()}");
-            
-            // Test hover state
-            button.OnMouseEnter();
-            Console.WriteLine($"Hovered CSS classes: {button.GetCssClasses()}");
-            
-            // Test async click
-            await button.ClickAsync(async () => {
-                Console.WriteLine("Starting async operation...");
-                await Task.Delay(2000); // Simulate work
-                Console.WriteLine("Async operation completed.");
-            });
-            
-            // Back to normal state
-            button.OnMouseLeave();
-            Console.WriteLine($"Final CSS classes: {button.GetCssClasses()}");
-        }
-    }
-}
-`;
-  } else {
-    return `// Sample code for: ${prompt}\n// Sorry, code generation for ${language} is not implemented yet.`;
-  }
-}
 
 export default CodeGeneration;
