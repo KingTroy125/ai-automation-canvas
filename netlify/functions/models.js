@@ -4,7 +4,7 @@ dotenv.config();
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
 };
 
@@ -20,6 +20,8 @@ const OPENAI_MODELS = {
 };
 
 export const handler = async (event, context) => {
+  console.log("Models function called with method:", event.httpMethod);
+  
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -39,10 +41,18 @@ export const handler = async (event, context) => {
   }
 
   try {
-    const availableModels = [];
+    console.log("Processing models request");
+    
+    // Create at least a mock model to prevent frontend errors
+    const availableModels = [{
+      id: "mock",
+      name: "Mock Model",
+      provider: "mock"
+    }];
     
     // Add Claude models if available
     if (process.env.ANTHROPIC_API_KEY) {
+      console.log("Adding Claude models");
       for (const [modelId, modelName] of Object.entries(CLAUDE_MODELS)) {
         availableModels.push({
           id: modelId,
@@ -50,10 +60,13 @@ export const handler = async (event, context) => {
           provider: "anthropic"
         });
       }
+    } else {
+      console.log("No Anthropic API key found");
     }
     
     // Add OpenAI models if available
     if (process.env.OPENAI_API_KEY) {
+      console.log("Adding OpenAI models");
       for (const [modelId, modelName] of Object.entries(OPENAI_MODELS)) {
         availableModels.push({
           id: modelId,
@@ -61,16 +74,11 @@ export const handler = async (event, context) => {
           provider: "openai"
         });
       }
+    } else {
+      console.log("No OpenAI API key found");
     }
     
-    // If no models available, add mock
-    if (availableModels.length === 0) {
-      availableModels.push({
-        id: "mock",
-        name: "Mock Model",
-        provider: "mock"
-      });
-    }
+    console.log(`Returning ${availableModels.length} models`);
     
     return {
       statusCode: 200,
@@ -80,12 +88,18 @@ export const handler = async (event, context) => {
     
   } catch (error) {
     console.error('Error in models function:', error);
+    
+    // Always return at least a mock model to prevent frontend errors
     return {
-      statusCode: 500,
+      statusCode: 200,
       headers: CORS_HEADERS,
-      body: JSON.stringify({
-        error: 'Internal server error',
-        message: error.message
+      body: JSON.stringify({ 
+        models: [{
+          id: "mock",
+          name: "Mock Model (Error Fallback)",
+          provider: "mock"
+        }],
+        error: error.message 
       })
     };
   }

@@ -1,4 +1,4 @@
-import { Configuration, OpenAIApi } from 'openai';
+import { OpenAI } from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import * as dotenv from 'dotenv';
 
@@ -6,7 +6,7 @@ dotenv.config();
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
 };
 
@@ -24,6 +24,8 @@ const OPENAI_MODELS = {
 const DEFAULT_CLAUDE_MODEL = "claude-3-5-sonnet-20240620";
 
 export const handler = async (event, context) => {
+  console.log("Chat function called with method:", event.httpMethod);
+  
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -54,15 +56,17 @@ export const handler = async (event, context) => {
 
     const messageContent = data.content;
     const requestedModel = data.model || 'auto';
+    
+    console.log(`Processing message with model: ${requestedModel}`);
 
     // OpenAI handling
     if (requestedModel in OPENAI_MODELS && process.env.OPENAI_API_KEY) {
       try {
-        const openai = new OpenAIApi(new Configuration({
+        const openai = new OpenAI({
           apiKey: process.env.OPENAI_API_KEY
-        }));
+        });
 
-        const response = await openai.createChatCompletion({
+        const response = await openai.chat.completions.create({
           model: requestedModel,
           messages: [{ role: 'user', content: messageContent }],
           max_tokens: 1000
@@ -72,7 +76,7 @@ export const handler = async (event, context) => {
           statusCode: 200,
           headers: CORS_HEADERS,
           body: JSON.stringify({
-            response: response.data.choices[0].message.content,
+            response: response.choices[0].message.content,
             model: requestedModel
           })
         };
@@ -119,34 +123,12 @@ export const handler = async (event, context) => {
       }
     }
 
-    // Fallback to OpenAI in auto mode
-    if (requestedModel === 'auto' && process.env.OPENAI_API_KEY) {
-      const fallbackModel = Object.keys(OPENAI_MODELS)[0] || "gpt-3.5-turbo";
-      const openai = new OpenAIApi(new Configuration({
-        apiKey: process.env.OPENAI_API_KEY
-      }));
-
-      const response = await openai.createChatCompletion({
-        model: fallbackModel,
-        messages: [{ role: 'user', content: messageContent }],
-        max_tokens: 1000
-      });
-
-      return {
-        statusCode: 200,
-        headers: CORS_HEADERS,
-        body: JSON.stringify({
-          response: response.data.choices[0].message.content,
-          model: fallbackModel
-        })
-      };
-    }
-
+    // Mock response when no APIs are available
     return {
-      statusCode: 503,
+      statusCode: 200,
       headers: CORS_HEADERS,
       body: JSON.stringify({
-        response: 'The requested AI model is not available.',
+        response: 'No API keys configured. This is a mock response from the Netlify function.',
         model: 'mock'
       })
     };

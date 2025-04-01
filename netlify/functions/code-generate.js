@@ -1,4 +1,4 @@
-import { Configuration, OpenAIApi } from 'openai';
+import { OpenAI } from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import * as dotenv from 'dotenv';
 
@@ -6,7 +6,7 @@ dotenv.config();
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
 };
 
@@ -24,6 +24,8 @@ const OPENAI_MODELS = {
 const DEFAULT_CLAUDE_MODEL = "claude-3-5-sonnet-20240620";
 
 export const handler = async (event, context) => {
+  console.log("Code generate function called with method:", event.httpMethod);
+  
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -56,6 +58,8 @@ export const handler = async (event, context) => {
     const requestedModel = data.model || 'auto';
     const language = data.language || '';
 
+    console.log(`Generating code with model: ${requestedModel}, language: ${language}`);
+
     // Construct a prompt that ensures only code is returned
     const codePrompt = language
       ? `Generate ONLY code in ${language} for the following task: ${prompt}. Return ONLY the code without any explanations, comments, or markdown formatting.`
@@ -64,11 +68,11 @@ export const handler = async (event, context) => {
     // OpenAI handling
     if (requestedModel in OPENAI_MODELS && process.env.OPENAI_API_KEY) {
       try {
-        const openai = new OpenAIApi(new Configuration({
+        const openai = new OpenAI({
           apiKey: process.env.OPENAI_API_KEY
-        }));
+        });
 
-        const response = await openai.createChatCompletion({
+        const response = await openai.chat.completions.create({
           model: requestedModel,
           messages: [
             { role: 'system', content: 'You are a code-only assistant. You must only return code without explanations or markdown formatting.' },
@@ -81,7 +85,7 @@ export const handler = async (event, context) => {
           statusCode: 200,
           headers: CORS_HEADERS,
           body: JSON.stringify({
-            code: response.data.choices[0].message.content.trim(),
+            code: response.choices[0].message.content.trim(),
             model: requestedModel
           })
         };
@@ -143,37 +147,12 @@ export const handler = async (event, context) => {
       }
     }
 
-    // Fallback to OpenAI in auto mode
-    if (requestedModel === 'auto' && process.env.OPENAI_API_KEY) {
-      const fallbackModel = Object.keys(OPENAI_MODELS)[0] || "gpt-3.5-turbo";
-      const openai = new OpenAIApi(new Configuration({
-        apiKey: process.env.OPENAI_API_KEY
-      }));
-
-      const response = await openai.createChatCompletion({
-        model: fallbackModel,
-        messages: [
-          { role: 'system', content: 'You are a code-only assistant. You must only return code without explanations or markdown formatting.' },
-          { role: 'user', content: codePrompt }
-        ],
-        max_tokens: 2000
-      });
-
-      return {
-        statusCode: 200,
-        headers: CORS_HEADERS,
-        body: JSON.stringify({
-          code: response.data.choices[0].message.content.trim(),
-          model: fallbackModel
-        })
-      };
-    }
-
+    // Mock response when no APIs are available
     return {
-      statusCode: 503,
+      statusCode: 200,
       headers: CORS_HEADERS,
       body: JSON.stringify({
-        code: "# No model available to generate code",
+        code: "// No API keys configured. This is a mock response from the Netlify function.\nconsole.log('Hello World');",
         model: "mock"
       })
     };
@@ -188,7 +167,7 @@ export const handler = async (event, context) => {
       statusCode: error.message.toLowerCase().includes('api key') ? 401 : 500,
       headers: CORS_HEADERS,
       body: JSON.stringify({
-        code: "# Error: " + error.message,
+        code: "// Error: " + error.message,
         error: error.message,
         model: 'error'
       })
