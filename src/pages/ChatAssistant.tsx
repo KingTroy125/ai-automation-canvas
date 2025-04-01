@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Bot, Send, User } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { getAvailableModels, sendChatMessage, testBackendConnection } from '../lib/api';
 
 interface Message {
   role: 'user' | 'bot';
@@ -38,6 +39,7 @@ const ChatAssistant: React.FC = () => {
     { id: 'auto', name: 'Auto (Default)', provider: 'auto' }
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,55 +50,69 @@ const ChatAssistant: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    const fetchAvailableModels = async () => {
+    // Test backend connection first
+    const checkBackendConnection = async () => {
+      setError('Connecting to AI service...');
+      const connectionTest = await testBackendConnection();
+      if (!connectionTest.success) {
+        console.error('Backend connection failed:', connectionTest.error);
+        setError('Could not connect to AI service. Check if the backend is running.');
+        return false;
+      }
+      console.log('Backend connection successful');
+      setError(null);
+      return true;
+    };
+
+    const fetchModels = async () => {
       try {
-        // First try the new models endpoint
-        const response = await fetch('http://localhost:8000/models');
-        if (response.ok) {
-          const data = await response.json();
-          // Add the auto option
+        const isConnected = await checkBackendConnection();
+        if (!isConnected) {
+          // Set default models as fallback
           setAvailableModels([
             { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
-            ...data.models
+            { id: 'mock', name: 'Mock Model', provider: 'mock' }
           ]);
-        } else {
-          // Fall back to the old endpoint
-          const oldResponse = await fetch('http://localhost:8000/verify-key');
-          if (oldResponse.ok) {
-            const data = await oldResponse.json();
-            const formattedModels = data.available_models.map((id: string) => {
-              if (id === 'claude-3-sonnet-20240229') {
-                return { id, name: 'Claude 3 Sonnet', provider: 'anthropic' };
-              } else if (id === 'claude-3-5-sonnet-20240620') {
-                return { id, name: 'Claude 3.5 Sonnet', provider: 'anthropic' };
-              } else if (id === 'gpt-4') {
-                return { id, name: 'GPT-4', provider: 'openai' };
-              } else if (id === 'gpt-4-turbo') {
-                return { id, name: 'GPT-4 Turbo', provider: 'openai' };
-              } else if (id === 'gpt-3.5-turbo') {
-                return { id, name: 'GPT-3.5 Turbo', provider: 'openai' };
-              } else {
-                return { id, name: id, provider: 'unknown' };
-              }
-            });
-            
-            setAvailableModels([
-              { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
-              ...formattedModels
-            ]);
-          }
+          return;
         }
-      } catch (error) {
-        console.error('Error fetching available models:', error);
-        toast({
-          title: "Connection Error",
-          description: "Could not connect to AI service. Check if the backend is running.",
-          variant: "destructive"
-        });
+        
+        const data = await getAvailableModels();
+        if (data && data.models && data.models.length > 0) {
+          // Make sure 'auto' is always included
+          if (!data.models.some(m => m.id === 'auto')) {
+            data.models.unshift({ id: 'auto', name: 'Auto (Default)', provider: 'auto' });
+          }
+          
+          setAvailableModels(data.models);
+          
+          // Set a default model if one is available
+          if (!selectedModel || selectedModel === 'auto') {
+            const defaultModel = data.models.find(m => m.provider === 'anthropic') 
+              || data.models.find(m => m.provider === 'openai') 
+              || data.models[0];
+            
+            setSelectedModel(defaultModel.id);
+          }
+        } else {
+          // Fallback for empty models array
+          setAvailableModels([
+            { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
+            { id: 'mock', name: 'Mock Model', provider: 'mock' }
+          ]);
+        }
+      } catch (err) {
+        console.error('Error fetching models:', err);
+        setError('Failed to load available models. Please check if the backend is running.');
+        
+        // Fallback for complete failure
+        setAvailableModels([
+          { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
+          { id: 'mock', name: 'Mock Model', provider: 'mock' }
+        ]);
       }
     };
 
-    fetchAvailableModels();
+    fetchModels();
   }, []);
 
   const handleSend = async (e: React.FormEvent) => {
@@ -115,24 +131,7 @@ const ChatAssistant: React.FC = () => {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8000/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'omit',
-        body: JSON.stringify({ 
-          content: input.trim(),
-          model: selectedModel 
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || data.response || `HTTP error! status: ${response.status}`);
-      }
+      const data = await sendChatMessage(input.trim(), selectedModel);
       
       const botMessage: Message = {
         role: 'bot',
@@ -221,55 +220,80 @@ const ChatAssistant: React.FC = () => {
         
         <Card className="flex-1 flex flex-col overflow-hidden p-4">
           <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-4">
-              {messages.map((message, index) => (
-                <div 
-                  key={index} 
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            {error ? (
+              <div className="p-4 mb-4 bg-red-100 text-red-700 rounded-md">
+                <h3 className="font-bold">Connection Error</h3>
+                <p>{error}</p>
+                <button 
+                  className="mt-2 px-3 py-1 bg-red-600 text-white rounded-md text-sm"
+                  onClick={async () => {
+                    const connectionTest = await testBackendConnection();
+                    if (connectionTest.success) {
+                      setError(null);
+                      getAvailableModels().then(data => {
+                        if (data && data.models) {
+                          setAvailableModels(data.models);
+                        }
+                      });
+                    } else {
+                      setError(`Still unable to connect: ${connectionTest.error}`);
+                    }
+                  }}
                 >
+                  Retry Connection
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((message, index) => (
                   <div 
-                    className={`flex max-w-[80%] space-x-2 ${
-                      message.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'
-                    }`}
+                    key={index} 
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <Avatar className="h-8 w-8">
-                      {message.role === 'user' ? (
-                        <>
-                          <AvatarFallback>U</AvatarFallback>
-                          <AvatarImage src="" alt="User" />
-                        </>
-                      ) : (
-                        <>
-                          <AvatarFallback className={`${message.isError ? 'bg-destructive/20 text-destructive' : 'bg-primary/20 text-primary'}`}>
-                            <Bot className="h-4 w-4" />
-                          </AvatarFallback>
-                        </>
-                      )}
-                    </Avatar>
                     <div 
-                      className={`rounded-lg p-3 ${
-                        message.role === 'user' 
-                          ? 'bg-primary text-primary-foreground' 
-                          : message.isError
-                            ? 'bg-destructive/10 text-destructive-foreground'
-                            : 'bg-muted'
+                      className={`flex max-w-[80%] space-x-2 ${
+                        message.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'
                       }`}
                     >
-                      {message.model && message.role === 'bot' && (
-                        <div className="text-xs font-medium mb-1 opacity-70">
-                          {getModelLabel(message.model)}
-                        </div>
-                      )}
-                      <p className="text-sm">{message.content}</p>
-                      <p className="mt-1 text-xs opacity-70">
-                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                      <Avatar className="h-8 w-8">
+                        {message.role === 'user' ? (
+                          <>
+                            <AvatarFallback>U</AvatarFallback>
+                            <AvatarImage src="" alt="User" />
+                          </>
+                        ) : (
+                          <>
+                            <AvatarFallback className={`${message.isError ? 'bg-destructive/20 text-destructive' : 'bg-primary/20 text-primary'}`}>
+                              <Bot className="h-4 w-4" />
+                            </AvatarFallback>
+                          </>
+                        )}
+                      </Avatar>
+                      <div 
+                        className={`rounded-lg p-3 ${
+                          message.role === 'user' 
+                            ? 'bg-primary text-primary-foreground' 
+                            : message.isError
+                              ? 'bg-destructive/10 text-destructive-foreground'
+                              : 'bg-muted'
+                        }`}
+                      >
+                        {message.model && message.role === 'bot' && (
+                          <div className="text-xs font-medium mb-1 opacity-70">
+                            {getModelLabel(message.model)}
+                          </div>
+                        )}
+                        <p className="text-sm">{message.content}</p>
+                        <p className="mt-1 text-xs opacity-70">
+                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
           </ScrollArea>
           
           <form onSubmit={handleSend} className="mt-4 flex items-end gap-2">

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +15,7 @@ import AIAgents from "./pages/AIAgents";
 import WorkflowAutomation from "./pages/WorkflowAutomation";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import TestPage from './Test';
 
 const queryClient = new QueryClient();
 
@@ -46,6 +46,7 @@ const App = () => (
           <Route path="/dashboard/*" element={<Navigate to="/dashboard" replace />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/test" element={<TestPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

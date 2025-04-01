@@ -6,21 +6,16 @@
 [functions]
   node_bundler = "esbuild"
   included_files = [".env"]
-  external_node_modules = ["@anthropic-ai/sdk", "openai", "dotenv"]
   
 [build.environment]
   NODE_VERSION = "18.17.0"
   NPM_VERSION = "9.8.1"
 
 [[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
@@ -33,6 +28,7 @@
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Cache-Control = "no-store, no-cache"
 
 [[plugins]]
   package = "@netlify/plugin-functions-install-core"

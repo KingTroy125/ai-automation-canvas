@@ -20,13 +20,15 @@ const OPENAI_MODELS = {
 };
 
 export const handler = async (event, context) => {
-  console.log("Models function called with method:", event.httpMethod);
-  
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
-      headers: CORS_HEADERS,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+      },
       body: ''
     };
   }
@@ -35,7 +37,11 @@ export const handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
-      headers: CORS_HEADERS,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+      },
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -43,17 +49,29 @@ export const handler = async (event, context) => {
   try {
     console.log("Processing models request");
     
-    // Create at least a mock model to prevent frontend errors
-    const availableModels = [{
-      id: "mock",
-      name: "Mock Model",
-      provider: "mock"
-    }];
+    // Always include at least these mock models to prevent frontend errors
+    const availableModels = [
+      {
+        id: "mock",
+        name: "Mock Model",
+        provider: "mock"
+      },
+      {
+        id: "auto",
+        name: "Auto (Default)",
+        provider: "auto"
+      }
+    ];
     
     // Add Claude models if available
     if (process.env.ANTHROPIC_API_KEY) {
       console.log("Adding Claude models");
-      for (const [modelId, modelName] of Object.entries(CLAUDE_MODELS)) {
+      const claudeModels = {
+        "claude-3-sonnet-20240229": "Claude 3 Sonnet",
+        "claude-3-5-sonnet-20240620": "Claude 3.5 Sonnet"
+      };
+      
+      for (const [modelId, modelName] of Object.entries(claudeModels)) {
         availableModels.push({
           id: modelId,
           name: modelName,
@@ -67,7 +85,13 @@ export const handler = async (event, context) => {
     // Add OpenAI models if available
     if (process.env.OPENAI_API_KEY) {
       console.log("Adding OpenAI models");
-      for (const [modelId, modelName] of Object.entries(OPENAI_MODELS)) {
+      const openaiModels = {
+        "gpt-4": "GPT-4",
+        "gpt-4-turbo": "GPT-4 Turbo",
+        "gpt-3.5-turbo": "GPT-3.5 Turbo"
+      };
+      
+      for (const [modelId, modelName] of Object.entries(openaiModels)) {
         availableModels.push({
           id: modelId,
           name: modelName,
@@ -82,23 +106,40 @@ export const handler = async (event, context) => {
     
     return {
       statusCode: 200,
-      headers: CORS_HEADERS,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+      },
       body: JSON.stringify({ models: availableModels })
     };
     
   } catch (error) {
     console.error('Error in models function:', error);
     
-    // Always return at least a mock model to prevent frontend errors
+    // Always return at least these mock models to prevent frontend errors
     return {
       statusCode: 200,
-      headers: CORS_HEADERS,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+      },
       body: JSON.stringify({ 
-        models: [{
-          id: "mock",
-          name: "Mock Model (Error Fallback)",
-          provider: "mock"
-        }],
+        models: [
+          {
+            id: "mock",
+            name: "Mock Model (Error Fallback)",
+            provider: "mock"
+          },
+          {
+            id: "auto",
+            name: "Auto (Default)",
+            provider: "auto"
+          }
+        ],
         error: error.message 
       })
     };
