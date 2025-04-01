@@ -4,6 +4,12 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+};
+
 const CLAUDE_MODELS = {
   "claude-3-sonnet-20240229": "Claude 3 Sonnet",
   "claude-3-5-sonnet-20240620": "Claude 3.5 Sonnet"
@@ -18,10 +24,20 @@ const OPENAI_MODELS = {
 const DEFAULT_CLAUDE_MODEL = "claude-3-5-sonnet-20240620";
 
 export const handler = async (event, context) => {
+  // Handle OPTIONS request for CORS
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: ''
+    };
+  }
+
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
+      headers: CORS_HEADERS,
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -31,6 +47,7 @@ export const handler = async (event, context) => {
     if (!data || !data.prompt) {
       return {
         statusCode: 400,
+        headers: CORS_HEADERS,
         body: JSON.stringify({ error: 'Missing prompt in request' })
       };
     }
@@ -62,6 +79,7 @@ export const handler = async (event, context) => {
 
         return {
           statusCode: 200,
+          headers: CORS_HEADERS,
           body: JSON.stringify({
             code: response.data.choices[0].message.content.trim(),
             model: requestedModel
@@ -109,6 +127,7 @@ export const handler = async (event, context) => {
 
         return {
           statusCode: 200,
+          headers: CORS_HEADERS,
           body: JSON.stringify({
             code: responseText,
             model: claudeModel
@@ -142,6 +161,7 @@ export const handler = async (event, context) => {
 
       return {
         statusCode: 200,
+        headers: CORS_HEADERS,
         body: JSON.stringify({
           code: response.data.choices[0].message.content.trim(),
           model: fallbackModel
@@ -151,6 +171,7 @@ export const handler = async (event, context) => {
 
     return {
       statusCode: 503,
+      headers: CORS_HEADERS,
       body: JSON.stringify({
         code: "# No model available to generate code",
         model: "mock"
@@ -165,6 +186,7 @@ export const handler = async (event, context) => {
 
     return {
       statusCode: error.message.toLowerCase().includes('api key') ? 401 : 500,
+      headers: CORS_HEADERS,
       body: JSON.stringify({
         code: "# Error: " + error.message,
         error: error.message,

@@ -2,6 +2,12 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+};
+
 const CLAUDE_MODELS = {
   "claude-3-sonnet-20240229": "Claude 3 Sonnet",
   "claude-3-5-sonnet-20240620": "Claude 3.5 Sonnet"
@@ -14,10 +20,20 @@ const OPENAI_MODELS = {
 };
 
 export const handler = async (event, context) => {
+  // Handle OPTIONS request for CORS
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: ''
+    };
+  }
+
   // Only allow GET requests
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
+      headers: CORS_HEADERS,
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -58,6 +74,7 @@ export const handler = async (event, context) => {
     
     return {
       statusCode: 200,
+      headers: CORS_HEADERS,
       body: JSON.stringify({ models: availableModels })
     };
     
@@ -65,6 +82,7 @@ export const handler = async (event, context) => {
     console.error('Error in models function:', error);
     return {
       statusCode: 500,
+      headers: CORS_HEADERS,
       body: JSON.stringify({
         error: 'Internal server error',
         message: error.message

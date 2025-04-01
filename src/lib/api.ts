@@ -1,13 +1,18 @@
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
+const API_BASE_URL = import.meta.env.PROD 
   ? '/.netlify/functions'
   : 'http://localhost:8000';
 
 export async function getAvailableModels() {
-  const response = await fetch(`${API_BASE_URL}/models`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch models: ${response.statusText}`);
+  try {
+    const response = await fetch(`${API_BASE_URL}/models`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Error fetching models:', error);
+    return { models: [{ id: 'mock', name: 'Mock Model', provider: 'mock' }] };
   }
-  return response.json();
 }
 
 export async function generateCode(prompt: string, model: string, language?: string) {
