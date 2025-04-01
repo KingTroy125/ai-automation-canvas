@@ -1,4 +1,4 @@
-const dotenv = require('dotenv');
+import * as dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -13,7 +13,7 @@ const OPENAI_MODELS = {
   "gpt-3.5-turbo": "GPT-3.5 Turbo"
 };
 
-exports.handler = async (event, context) => {
+export const handler = async (event, context) => {
   // Only allow GET requests
   if (event.httpMethod !== 'GET') {
     return {

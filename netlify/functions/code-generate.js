@@ -1,6 +1,6 @@
-const { Configuration, OpenAIApi } = require('openai');
-const Anthropic = require('@anthropic-ai/sdk');
-const dotenv = require('dotenv');
+import { Configuration, OpenAIApi } from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
+import * as dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -17,7 +17,7 @@ const OPENAI_MODELS = {
 
 const DEFAULT_CLAUDE_MODEL = "claude-3-5-sonnet-20240620";
 
-exports.handler = async (event, context) => {
+export const handler = async (event, context) => {
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {

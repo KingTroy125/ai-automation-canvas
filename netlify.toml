@@ -1,16 +1,19 @@
 [build]
-  command = "npm run build"
+  command = "npm install && npm run build"
   publish = "dist"
   functions = "netlify/functions"
 
 [functions]
-  external_node_modules = ["@netlify/functions"]
   node_bundler = "esbuild"
+  external_node_modules = ["@anthropic-ai/sdk", "openai", "dotenv"]
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
+
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
 
 [dev]
   command = "npm run dev"
