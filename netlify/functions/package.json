@@ -1,0 +1,11 @@
+{
+  "name": "ai-automation-canvas-functions",
+  "version": "1.0.0",
+  "description": "Netlify Functions for AI Automation Canvas",
+  "main": "index.js",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.17.1",
+    "openai": "^4.28.0",
+    "dotenv": "^16.4.5"
+  }
+} 

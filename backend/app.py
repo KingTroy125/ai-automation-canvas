@@ -254,7 +254,7 @@ def code_generate():
                             messages=[
                                 {"role": "user", "content": code_prompt}
                             ],
-                            system="You are a code-only assistant. You must only return code without explanations or markdown formatting."
+                            system="You are a code-only assistant. You must only return code without explanations or markdown formatting. Do not include any text before or after the code."
                         )
                     except TypeError as te:
                         if 'socket_options' in str(te):
@@ -273,7 +273,7 @@ def code_generate():
                                 messages=[
                                     {"role": "user", "content": code_prompt}
                                 ],
-                                system="You are a code-only assistant. You must only return code without explanations or markdown formatting."
+                                system="You are a code-only assistant. You must only return code without explanations or markdown formatting. Do not include any text before or after the code."
                             )
                         else:
                             raise
@@ -318,7 +318,7 @@ def code_generate():
                         "model": claude_model,
                         "max_tokens": 2000,
                         "messages": [{"role": "user", "content": code_prompt}],
-                        "system": "You are a code-only assistant. You must only return code without explanations or markdown formatting."
+                        "system": "You are a code-only assistant. You must only return code without explanations or markdown formatting. Do not include any text before or after the code."
                     }
                     
                     # Use httpx with proper SSL context
@@ -493,8 +493,8 @@ def chat():
                     response = openai.ChatCompletion.create(
                         model=requested_model,
                         messages=[{"role": "user", "content": message_content}],
-                        max_tokens=1000
-                    )
+                max_tokens=1000
+            )
                     return jsonify({
                         "response": response.choices[0].message.content,
                         "model": requested_model
@@ -526,7 +526,7 @@ def chat():
                             messages=[
                                 {"role": "user", "content": message_content}
                             ],
-                            system="You are a code-only assistant. You must only return code without explanations or markdown formatting."
+                            system="You are a helpful and friendly AI assistant. You should engage in natural conversation, be polite, and provide helpful responses. You can help with coding questions but should also be able to have general conversations."
                         )
                     except TypeError as te:
                         if 'socket_options' in str(te):

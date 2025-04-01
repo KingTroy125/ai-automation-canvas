@@ -222,6 +222,9 @@ const CodeGeneration: React.FC = () => {
     if (modelId.includes('gpt-4-turbo')) return 'GPT-4 Turbo';
     if (modelId.includes('gpt-4')) return 'GPT-4';
     if (modelId.includes('gpt-3.5')) return 'GPT-3.5 Turbo';
+    if (modelId.includes('deepseek-chat')) return 'DeepSeek Chat';
+    if (modelId.includes('deepseek-coder')) return 'DeepSeek Coder';
+    if (modelId.includes('deepseek-v3')) return 'DeepSeek v3';
     
     return modelId;
   };
@@ -441,16 +444,16 @@ const CodeGeneration: React.FC = () => {
                       {getModelDisplayName(usedModel)}
                     </span>
                   )}
-                  {generatedCode && (
+                {generatedCode && (
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="sm" onClick={downloadCode} title="Download code">
                         <Download className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={copyToClipboard} title="Copy to clipboard">
                         <ClipboardCopy className="h-4 w-4" />
-                      </Button>
+                  </Button>
                     </div>
-                  )}
+                )}
                 </div>
               </div>
               <div className="relative bg-zinc-950 rounded-md overflow-hidden">

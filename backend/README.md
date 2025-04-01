@@ -7,9 +7,11 @@
 cp .env.example .env
 ```
 
-2. Add your Anthropic API key to the `.env` file:
+2. Add your API keys to the `.env` file:
 ```
-ANTHROPIC_API_KEY=your_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+OPENAI_API_KEY=your_openai_key_here
+DEEPSEEK_API_KEY=your_deepseek_key_here
 ```
 
 3. Install dependencies:
@@ -22,4 +24,4 @@ pip install -r requirements.txt
 python run.py
 ```
 
-**Note**: Never commit your `.env` file or share your API key publicly!
+**Note**: Never commit your `.env` file or share your API keys publicly!
