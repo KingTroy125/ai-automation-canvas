@@ -11,6 +11,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { generateCode, getAvailableModels, testBackendConnection } from '@/lib/api';
 
 interface Model {
   id: string;
@@ -32,56 +33,73 @@ const CodeGeneration: React.FC = () => {
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [includeComments, setIncludeComments] = useState(false);
   const [codeLength, setCodeLength] = useState(1); // 1 = Normal, 0 = Concise, 2 = Detailed
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch available models on component mount
+  // Test backend connection and fetch models
   useEffect(() => {
-    const fetchAvailableModels = async () => {
+    // Test backend connection first
+    const checkBackendConnection = async () => {
+      setError('Connecting to AI service...');
+      const connectionTest = await testBackendConnection();
+      if (!connectionTest.success) {
+        console.error('Backend connection failed:', connectionTest.error);
+        setError('Could not connect to AI service. Check if the backend is running.');
+        return false;
+      }
+      console.log('Backend connection successful');
+      setError(null);
+      return true;
+    };
+
+    const fetchModels = async () => {
       try {
-        const response = await fetch('http://localhost:8000/models');
-        if (response.ok) {
-          const data = await response.json();
+        const isConnected = await checkBackendConnection();
+        if (!isConnected) {
+          // Set default models as fallback
           setAvailableModels([
             { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
-            ...data.models
+            { id: 'mock', name: 'Mock Model', provider: 'mock' }
           ]);
-        } else {
-          // Fall back to verify-key endpoint
-          const fallbackResponse = await fetch('http://localhost:8000/verify-key');
-          if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json();
-            const formattedModels = data.available_models.map((id: string) => {
-              if (id === 'claude-3-sonnet-20240229') {
-                return { id, name: 'Claude 3 Sonnet', provider: 'anthropic' };
-              } else if (id === 'claude-3-5-sonnet-20240620') {
-                return { id, name: 'Claude 3.5 Sonnet', provider: 'anthropic' };
-              } else if (id === 'gpt-4') {
-                return { id, name: 'GPT-4', provider: 'openai' };
-              } else if (id === 'gpt-4-turbo') {
-                return { id, name: 'GPT-4 Turbo', provider: 'openai' };
-              } else if (id === 'gpt-3.5-turbo') {
-                return { id, name: 'GPT-3.5 Turbo', provider: 'openai' };
-              } else {
-                return { id, name: id, provider: 'unknown' };
-              }
-            });
-            
-            setAvailableModels([
-              { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
-              ...formattedModels
-            ]);
-          }
+          return;
         }
-      } catch (error) {
-        console.error('Error fetching available models:', error);
-        toast({
-          title: "Connection Error",
-          description: "Could not connect to AI service. Check if the backend is running.",
-          variant: "destructive"
-        });
+        
+        const data = await getAvailableModels();
+        if (data && data.models && data.models.length > 0) {
+          // Make sure 'auto' is always included
+          if (!data.models.some(m => m.id === 'auto')) {
+            data.models.unshift({ id: 'auto', name: 'Auto (Default)', provider: 'auto' });
+          }
+          
+          setAvailableModels(data.models);
+          
+          // Set a default model if one is available
+          if (!selectedModel || selectedModel === 'auto') {
+            const defaultModel = data.models.find(m => m.provider === 'anthropic') 
+              || data.models.find(m => m.provider === 'openai') 
+              || data.models[0];
+            
+            setSelectedModel(defaultModel.id);
+          }
+        } else {
+          // Fallback for empty models array
+          setAvailableModels([
+            { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
+            { id: 'mock', name: 'Mock Model', provider: 'mock' }
+          ]);
+        }
+      } catch (err) {
+        console.error('Error fetching models:', err);
+        setError('Failed to load available models. Please check if the backend is running.');
+        
+        // Fallback for complete failure
+        setAvailableModels([
+          { id: 'auto', name: 'Auto (Default)', provider: 'auto' },
+          { id: 'mock', name: 'Mock Model', provider: 'mock' }
+        ]);
       }
     };
 
-    fetchAvailableModels();
+    fetchModels();
   }, []);
 
   const getFrameworkOptions = (lang: string) => {
@@ -140,73 +158,25 @@ const CodeGeneration: React.FC = () => {
     }
   }, [language]);
 
-  const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a prompt first",
-        variant: "destructive"
-      });
-      return;
-    }
+  const handleGenerateCode = async () => {
+    if (!prompt) return;
     
     setIsLoading(true);
+    setGeneratedCode('');
+    setError(null);
     
     try {
-      // Prepare the prompt with framework if selected
-      let fullPrompt = prompt;
+      const data = await generateCode(
+        prompt, 
+        selectedModel, 
+        language || undefined
+      );
       
-      if (framework && framework !== 'none') {
-        fullPrompt += ` using ${framework} framework`;
-      }
-      
-      // Add style preferences based on advanced options
-      if (showAdvancedOptions) {
-        if (includeComments) {
-          fullPrompt += ". Include helpful comments in the code";
-        } else {
-          fullPrompt += ". Minimize comments in the code";
-        }
-        
-        if (codeLength === 0) {
-          fullPrompt += ". Make the code as concise as possible";
-        } else if (codeLength === 2) {
-          fullPrompt += ". Provide a more detailed implementation";
-        }
-      }
-      
-      // Call the backend API to generate code
-      const response = await fetch('http://localhost:8000/code-generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: fullPrompt,
-          model: selectedModel,
-          language: language
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
       setGeneratedCode(data.code);
-      setUsedModel(data.model);
-      
-      toast({
-        title: "Success",
-        description: `Code generated successfully using ${getModelDisplayName(data.model)}`,
-      });
-    } catch (error) {
-      console.error('Error generating code:', error);
-      toast({
-        title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Failed to generate code",
-        variant: "destructive"
-      });
+      setUsedModel(data.model || selectedModel);
+    } catch (err) {
+      console.error('Error generating code:', err);
+      setError(`Failed to generate code: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -423,7 +393,7 @@ const CodeGeneration: React.FC = () => {
                 )}
                 
                 <Button 
-                  onClick={handleGenerate} 
+                  onClick={handleGenerateCode} 
                   className="w-full" 
                   disabled={isLoading || !prompt.trim()}
                 >
@@ -457,15 +427,40 @@ const CodeGeneration: React.FC = () => {
                 </div>
               </div>
               <div className="relative bg-zinc-950 rounded-md overflow-hidden">
-                {generatedCode ? (
-                  <pre className="p-4 text-zinc-100 overflow-x-auto">
-                    <code>{generatedCode}</code>
-                  </pre>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-[300px] text-zinc-500">
-                    <Code className="h-12 w-12 mb-2 opacity-20" />
-                    <p>Generated code will appear here</p>
+                {error ? (
+                  <div className="p-4 mb-4 bg-red-100 text-red-700 rounded-md">
+                    <h3 className="font-bold">Connection Error</h3>
+                    <p>{error}</p>
+                    <button 
+                      className="mt-2 px-3 py-1 bg-red-600 text-white rounded-md text-sm"
+                      onClick={async () => {
+                        const connectionTest = await testBackendConnection();
+                        if (connectionTest.success) {
+                          setError(null);
+                          getAvailableModels().then(data => {
+                            if (data && data.models) {
+                              setAvailableModels(data.models);
+                            }
+                          });
+                        } else {
+                          setError(`Still unable to connect: ${connectionTest.error}`);
+                        }
+                      }}
+                    >
+                      Retry Connection
+                    </button>
                   </div>
+                ) : (
+                  generatedCode ? (
+                    <pre className="p-4 text-zinc-100 overflow-x-auto">
+                      <code>{generatedCode}</code>
+                    </pre>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-[300px] text-zinc-500">
+                      <Code className="h-12 w-12 mb-2 opacity-20" />
+                      <p>Generated code will appear here</p>
+                    </div>
+                  )
                 )}
               </div>
             </CardContent>

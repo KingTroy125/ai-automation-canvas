@@ -42,6 +42,7 @@ load_dotenv()
 # Get API keys
 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 openai_api_key = os.getenv("OPENAI_API_KEY")
+deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
 
 # Available OpenAI models
 OPENAI_MODELS = {
@@ -56,11 +57,22 @@ CLAUDE_MODELS = {
     "claude-3-5-sonnet-20240620": "Claude 3.5 Sonnet"
 }
 
+# Available DeepSeek models
+DEEPSEEK_MODELS = {
+    "deepseek-chat": "DeepSeek Chat",
+    "deepseek-coder": "DeepSeek Coder",
+    "deepseek-v3": "DeepSeek v3"
+}
+
 # Default Claude model to use
 DEFAULT_CLAUDE_MODEL = "claude-3-5-sonnet-20240620"
+# Default DeepSeek model to use
+DEFAULT_DEEPSEEK_MODEL = "deepseek-v3"
 
 # For testing fallback - set to True to simulate Claude being down
 SIMULATE_CLAUDE_DOWN = False
+# For testing fallback - set to True to simulate DeepSeek being down
+SIMULATE_DEEPSEEK_DOWN = False
 
 # Create Flask app
 app = Flask(__name__)
@@ -94,6 +106,15 @@ def get_models():
                 "provider": "openai"
             })
     
+    # Add DeepSeek models if available
+    if deepseek_api_key and not SIMULATE_DEEPSEEK_DOWN:
+        for model_id, model_name in DEEPSEEK_MODELS.items():
+            available_models.append({
+                "id": model_id,
+                "name": model_name,
+                "provider": "deepseek"
+            })
+    
     # If no models available, add mock
     if not available_models:
         available_models.append({
@@ -112,6 +133,8 @@ def verify_key():
     if openai_api_key:
         for model_id in OPENAI_MODELS.keys():
             available_models.append(model_id)
+    if deepseek_api_key and not SIMULATE_DEEPSEEK_DOWN:
+        available_models.extend(DEEPSEEK_MODELS.keys())
     
     if not available_models:
         available_models = ["mock"]
@@ -124,6 +147,13 @@ def toggle_claude():
     SIMULATE_CLAUDE_DOWN = not SIMULATE_CLAUDE_DOWN
     status = "DOWN" if SIMULATE_CLAUDE_DOWN else "UP"
     return jsonify({"status": f"Claude simulation is now {status}"})
+
+@app.route('/toggle-deepseek', methods=['POST'])
+def toggle_deepseek():
+    global SIMULATE_DEEPSEEK_DOWN
+    SIMULATE_DEEPSEEK_DOWN = not SIMULATE_DEEPSEEK_DOWN
+    status = "DOWN" if SIMULATE_DEEPSEEK_DOWN else "UP"
+    return jsonify({"status": f"DeepSeek simulation is now {status}"})
 
 @app.route('/code-generate', methods=['POST'])
 def code_generate():
@@ -361,6 +391,82 @@ def code_generate():
                     pass  # Continue to OpenAI fallback
                 else:
                     raise
+        
+        # If user specifically requests a DeepSeek model or it's set to auto and DeepSeek is available
+        is_deepseek_request = requested_model in DEEPSEEK_MODELS.keys() or requested_model == 'auto'
+        if is_deepseek_request and deepseek_api_key and not SIMULATE_DEEPSEEK_DOWN:
+            try:
+                # Import DeepSeek with compatibility handling
+                import deepseek
+                
+                # Determine which DeepSeek model to use
+                deepseek_model = requested_model if requested_model in DEEPSEEK_MODELS.keys() else DEFAULT_DEEPSEEK_MODEL
+                
+                try:
+                    # Create DeepSeek client
+                    client = deepseek.Client(api_key=deepseek_api_key)
+                    
+                    try:
+                        # Call DeepSeek API for code generation
+                        response = client.generate(
+                            prompt=code_prompt,
+                            model=deepseek_model,
+                            max_tokens=2000,
+                            temperature=0.2,  # Lower temperature for code generation
+                            system_prompt="You are a code-only assistant. You must only return code without explanations or markdown formatting."
+                        )
+                        return jsonify({
+                            "code": response.text.strip(),
+                            "model": deepseek_model
+                        })
+                    except Exception as api_error:
+                        print(f"DeepSeek API call error: {str(api_error)}")
+                        print(traceback.format_exc())
+                        raise
+                except Exception as client_error:
+                    print(f"DeepSeek client creation error: {str(client_error)}")
+                    print(traceback.format_exc())
+                    
+                    # Try direct API call as fallback
+                    import httpx
+                    
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {deepseek_api_key}"
+                    }
+                    
+                    payload = {
+                        "model": deepseek_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a code-only assistant. You must only return code without explanations or markdown formatting."},
+                            {"role": "user", "content": code_prompt}
+                        ],
+                        "max_tokens": 2000,
+                        "temperature": 0.2
+                    }
+                    
+                    api_response = httpx.post(
+                        "https://api.deepseek.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=60.0,
+                        verify=certifi.where()
+                    )
+                    
+                    if api_response.status_code == 200:
+                        response_json = api_response.json()
+                        response_text = response_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        
+                        return jsonify({
+                            "code": response_text,
+                            "model": deepseek_model
+                        })
+                    else:
+                        raise Exception(f"DeepSeek API call failed: {api_response.status_code} - {api_response.text}")
+            except Exception as e:
+                print(f"DeepSeek API error: {str(e)}")
+                print(traceback.format_exc())
+                raise
         
         # Fall back to OpenAI if in auto mode
         if requested_model == 'auto' and openai_api_key:
@@ -629,6 +735,82 @@ def chat():
                     pass  # Continue to OpenAI fallback
                 else:
                     raise  # If user specifically requested Claude, raise the error
+        
+        # If user specifically requests a DeepSeek model or it's set to auto and DeepSeek is available
+        is_deepseek_request = requested_model in DEEPSEEK_MODELS.keys() or requested_model == 'auto'
+        if is_deepseek_request and deepseek_api_key and not SIMULATE_DEEPSEEK_DOWN:
+            try:
+                # Import DeepSeek with compatibility handling
+                import deepseek
+                
+                # Determine which DeepSeek model to use
+                deepseek_model = requested_model if requested_model in DEEPSEEK_MODELS.keys() else DEFAULT_DEEPSEEK_MODEL
+                
+                try:
+                    # Create DeepSeek client
+                    client = deepseek.Client(api_key=deepseek_api_key)
+                    
+                    try:
+                        # Call DeepSeek API for chat
+                        response = client.generate(
+                            prompt=message_content,
+                            model=deepseek_model,
+                            max_tokens=2000,
+                            temperature=0.7,
+                            system_prompt="You are a helpful and friendly AI assistant. You should engage in natural conversation, be polite, and provide helpful responses. You can help with coding questions but should also be able to have general conversations."
+                        )
+                        return jsonify({
+                            "response": response.text.strip(),
+                            "model": deepseek_model
+                        })
+                    except Exception as api_error:
+                        print(f"DeepSeek API call error: {str(api_error)}")
+                        print(traceback.format_exc())
+                        raise
+                except Exception as client_error:
+                    print(f"DeepSeek client creation error: {str(client_error)}")
+                    print(traceback.format_exc())
+                    
+                    # Try direct API call as fallback
+                    import httpx
+                    
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {deepseek_api_key}"
+                    }
+                    
+                    payload = {
+                        "model": deepseek_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a helpful and friendly AI assistant. You should engage in natural conversation, be polite, and provide helpful responses. You can help with coding questions but should also be able to have general conversations."},
+                            {"role": "user", "content": message_content}
+                        ],
+                        "max_tokens": 2000,
+                        "temperature": 0.7
+                    }
+                    
+                    api_response = httpx.post(
+                        "https://api.deepseek.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=60.0,
+                        verify=certifi.where()
+                    )
+                    
+                    if api_response.status_code == 200:
+                        response_json = api_response.json()
+                        response_text = response_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        
+                        return jsonify({
+                            "response": response_text,
+                            "model": deepseek_model
+                        })
+                    else:
+                        raise Exception(f"DeepSeek API call failed: {api_response.status_code} - {api_response.text}")
+            except Exception as e:
+                print(f"DeepSeek API error: {str(e)}")
+                print(traceback.format_exc())
+                raise
         
         # Fall back to OpenAI if in auto mode
         if requested_model == 'auto' and openai_api_key:

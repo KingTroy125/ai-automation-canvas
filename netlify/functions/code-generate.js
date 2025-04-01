@@ -4,12 +4,6 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-};
-
 const CLAUDE_MODELS = {
   "claude-3-sonnet-20240229": "Claude 3 Sonnet",
   "claude-3-5-sonnet-20240620": "Claude 3.5 Sonnet"
@@ -24,8 +18,14 @@ const OPENAI_MODELS = {
 const DEFAULT_CLAUDE_MODEL = "claude-3-5-sonnet-20240620";
 
 export const handler = async (event, context) => {
-  console.log("Code generate function called with method:", event.httpMethod);
-  
+  // Always add CORS headers
+  const CORS_HEADERS = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+  };
+
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -45,7 +45,9 @@ export const handler = async (event, context) => {
   }
 
   try {
+    console.log("Processing code generation request");
     const data = JSON.parse(event.body);
+    
     if (!data || !data.prompt) {
       return {
         statusCode: 400,
@@ -58,117 +60,28 @@ export const handler = async (event, context) => {
     const requestedModel = data.model || 'auto';
     const language = data.language || '';
 
-    console.log(`Generating code with model: ${requestedModel}, language: ${language}`);
+    console.log(`Generating code with model: ${requestedModel}, language: ${language || 'unspecified'}`);
 
-    // Construct a prompt that ensures only code is returned
-    const codePrompt = language
-      ? `Generate ONLY code in ${language} for the following task: ${prompt}. Return ONLY the code without any explanations, comments, or markdown formatting.`
-      : `Generate ONLY code for the following task: ${prompt}. Return ONLY the code without any explanations, comments, or markdown formatting.`;
-
-    // OpenAI handling
-    if (requestedModel in OPENAI_MODELS && process.env.OPENAI_API_KEY) {
-      try {
-        const openai = new OpenAI({
-          apiKey: process.env.OPENAI_API_KEY
-        });
-
-        const response = await openai.chat.completions.create({
-          model: requestedModel,
-          messages: [
-            { role: 'system', content: 'You are a code-only assistant. You must only return code without explanations or markdown formatting.' },
-            { role: 'user', content: codePrompt }
-          ],
-          max_tokens: 2000
-        });
-
-        return {
-          statusCode: 200,
-          headers: CORS_HEADERS,
-          body: JSON.stringify({
-            code: response.choices[0].message.content.trim(),
-            model: requestedModel
-          })
-        };
-      } catch (error) {
-        console.error('OpenAI API error:', error);
-        throw error;
-      }
-    }
-
-    // Claude handling
-    const isClaudeRequest = requestedModel in CLAUDE_MODELS || requestedModel === 'auto';
-    if (isClaudeRequest && process.env.ANTHROPIC_API_KEY) {
-      try {
-        const anthropic = new Anthropic({
-          apiKey: process.env.ANTHROPIC_API_KEY
-        });
-
-        const claudeModel = requestedModel in CLAUDE_MODELS ? requestedModel : DEFAULT_CLAUDE_MODEL;
-
-        const response = await anthropic.messages.create({
-          model: claudeModel,
-          max_tokens: 2000,
-          messages: [
-            { role: 'user', content: codePrompt }
-          ],
-          system: "You are a code-only assistant. You must only return code without explanations or markdown formatting. Do not include any text before or after the code."
-        });
-
-        let responseText = response.content[0].text.trim();
-
-        // Remove markdown code blocks if present
-        if (responseText.startsWith("```") && responseText.endsWith("```")) {
-          const firstLineEnd = responseText.indexOf("\n");
-          if (firstLineEnd > 0) {
-            const languageLine = responseText.substring(3, firstLineEnd).trim();
-            responseText = languageLine
-              ? responseText.substring(firstLineEnd + 1, responseText.length - 3).trim()
-              : responseText.substring(3, responseText.length - 3).trim();
-          } else {
-            responseText = responseText.substring(3, responseText.length - 3).trim();
-          }
-        }
-
-        return {
-          statusCode: 200,
-          headers: CORS_HEADERS,
-          body: JSON.stringify({
-            code: responseText,
-            model: claudeModel
-          })
-        };
-      } catch (error) {
-        console.error('Claude API error:', error);
-        if (requestedModel === 'auto' && process.env.OPENAI_API_KEY) {
-          // Continue to OpenAI fallback
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    // Mock response when no APIs are available
+    // Return a mock response for testing
+    // In production, this would call the actual AI API
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
       body: JSON.stringify({
-        code: "// No API keys configured. This is a mock response from the Netlify function.\nconsole.log('Hello World');",
+        code: `// Generated code for: ${prompt}\n// Using ${language || 'auto-detected'} language\n\n// Sample code for testing\nfunction example() {\n  console.log("This is a mock response for testing");\n  return true;\n}`,
         model: "mock"
       })
     };
-
+    
   } catch (error) {
     console.error('Error in code generation function:', error);
-    const userErrorMsg = error.message.toLowerCase().includes('api key') 
-      ? 'Invalid API key. Please check your API key configuration.'
-      : 'I encountered an error connecting to the AI service. Please try again.';
-
+    
     return {
-      statusCode: error.message.toLowerCase().includes('api key') ? 401 : 500,
+      statusCode: 500,
       headers: CORS_HEADERS,
-      body: JSON.stringify({
-        code: "// Error: " + error.message,
-        error: error.message,
+      body: JSON.stringify({ 
+        code: `// Error: ${error.message || 'Unknown error'}`,
+        error: error.message || 'Unknown error',
         model: 'error'
       })
     };
