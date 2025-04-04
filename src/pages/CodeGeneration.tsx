@@ -34,6 +34,7 @@ const CodeGeneration: React.FC = () => {
   const [includeComments, setIncludeComments] = useState(false);
   const [codeLength, setCodeLength] = useState(1); // 1 = Normal, 0 = Concise, 2 = Detailed
   const [error, setError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Test backend connection and fetch models
   useEffect(() => {
@@ -242,7 +243,7 @@ const CodeGeneration: React.FC = () => {
   
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Code Generation</h1>
           <p className="text-muted-foreground mt-2">
@@ -257,6 +258,7 @@ const CodeGeneration: React.FC = () => {
                 <div>
                   <label className="text-sm font-medium mb-2 block">Describe what you want to build</label>
                   <Textarea 
+                    id="prompt-input"
                     placeholder="E.g., Create a React button component with hover effects and loading state"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
@@ -421,48 +423,239 @@ const CodeGeneration: React.FC = () => {
                       </Button>
                       <Button variant="ghost" size="sm" onClick={copyToClipboard} title="Copy to clipboard">
                         <ClipboardCopy className="h-4 w-4" />
-                  </Button>
+                      </Button>
                     </div>
                 )}
                 </div>
               </div>
-              <div className="relative bg-zinc-950 rounded-md overflow-hidden">
-                {error ? (
-                  <div className="p-4 mb-4 bg-red-100 text-red-700 rounded-md">
-                    <h3 className="font-bold">Connection Error</h3>
-                    <p>{error}</p>
-                    <button 
-                      className="mt-2 px-3 py-1 bg-red-600 text-white rounded-md text-sm"
-                      onClick={async () => {
-                        const connectionTest = await testBackendConnection();
-                        if (connectionTest.success) {
-                          setError(null);
-                          getAvailableModels().then(data => {
-                            if (data && data.models) {
-                              setAvailableModels(data.models);
-                            }
-                          });
-                        } else {
-                          setError(`Still unable to connect: ${connectionTest.error}`);
-                        }
-                      }}
-                    >
-                      Retry Connection
-                    </button>
-                  </div>
-                ) : (
-                  generatedCode ? (
-                    <pre className="p-4 text-zinc-100 overflow-x-auto">
-                      <code>{generatedCode}</code>
-                    </pre>
+              
+              {/* Tabs for code view and live preview */}
+              {generatedCode && !error ? (
+                <Tabs defaultValue="code" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger value="code">
+                      <Code className="h-4 w-4 mr-2" />
+                      Code
+                    </TabsTrigger>
+                    <TabsTrigger value="preview">
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Live Preview
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="code" className="mt-0">
+                    <div className="relative bg-zinc-950 rounded-md overflow-hidden">
+                      <pre className="p-4 text-zinc-100 overflow-x-auto">
+                        <code>{generatedCode}</code>
+                      </pre>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="preview" className="mt-0">
+                    <div className="rounded-md overflow-hidden border border-zinc-200 dark:border-zinc-800">
+                      {/* Browser-like header */}
+                      <div className="bg-zinc-200 dark:bg-zinc-800 flex items-center gap-2 px-3 py-2">
+                        <div className="flex gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <div className="bg-white dark:bg-zinc-900 rounded px-2 py-1 text-xs flex-grow text-center">
+                          preview
+                        </div>
+                      </div>
+                      
+                      {/* Live preview area */}
+                      <div className="bg-white dark:bg-zinc-950 p-6 min-h-[300px] flex flex-col items-center justify-center">
+                        {/* HTML Rendering */}
+                        {language === 'html' && (
+                          <div className="w-full h-full flex flex-col">
+                            <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-md text-blue-800 dark:text-blue-200 text-sm">
+                              <p>Rendered HTML preview with CSS support</p>
+                            </div>
+                            
+                            {/* Using iframe sandbox for secure rendering */}
+                            <div className="w-full flex-grow border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden bg-white">
+                              <iframe
+                                title="HTML Preview"
+                                sandbox="allow-scripts"
+                                className="w-full h-[300px]"
+                                srcDoc={`
+                                  <!DOCTYPE html>
+                                  <html>
+                                    <head>
+                                      <meta charset="UTF-8">
+                                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                      <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                                      ${framework === 'bootstrap' ? '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">' : ''}
+                                      <style>
+                                        body { 
+                                          padding: 1rem;
+                                          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                        }
+                                        /* Fix for tailwind preflight interfering with bootstrap */
+                                        ${framework === 'bootstrap' ? '*, ::before, ::after { box-sizing: border-box; }' : ''}
+                                      </style>
+                                    </head>
+                                    <body>
+                                      ${generatedCode}
+                                      ${framework === 'bootstrap' ? '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>' : ''}
+                                    </body>
+                                  </html>
+                                `}
+                              />
+                            </div>
+                            
+                            <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                              <p>Note: For security reasons, some interactive features might be limited in the preview</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* For non-HTML languages, show a placeholder */}
+                        {language !== 'html' && (
+                          <div className="text-center p-6 w-full">
+                            {/* React components preview */}
+                            {(language === 'javascript' || language === 'typescript') && framework === 'react' ? (
+                              <div className="space-y-4">
+                                <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-md text-blue-800 dark:text-blue-200 text-sm mb-4">
+                                  <p>Simulated React component preview based on the generated code</p>
+                                </div>
+                                
+                                <div className="p-6 border rounded-md border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+                                  {/* Detect button components */}
+                                  {generatedCode.includes('button') || generatedCode.includes('Button') ? (
+                                    <div className="flex flex-col gap-3 items-center">
+                                      <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors">
+                                        Primary Button
+                                      </button>
+                                      
+                                      {/* Show loading button if the code has loading state */}
+                                      {generatedCode.includes('loading') || generatedCode.includes('Loading') || generatedCode.includes('isLoading') ? (
+                                        <button className="px-4 py-2 bg-blue-500 text-white rounded opacity-70 cursor-not-allowed flex items-center justify-center gap-2">
+                                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                          </svg>
+                                          Loading...
+                                        </button>
+                                      ) : null}
+                                      
+                                      {/* Show secondary button if variants are mentioned */}
+                                      {generatedCode.includes('variant') || generatedCode.includes('secondary') || generatedCode.includes('Secondary') ? (
+                                        <button className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 transition-colors">
+                                          Secondary Button
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  ) : generatedCode.includes('Card') || generatedCode.includes('card') ? (
+                                    /* Card component preview */
+                                    <div className="max-w-sm rounded-lg overflow-hidden shadow-lg bg-white dark:bg-zinc-800">
+                                      <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-600"></div>
+                                      <div className="px-6 py-4">
+                                        <div className="font-bold text-xl mb-2">Card Title</div>
+                                        <p className="text-gray-700 dark:text-gray-300 text-base">
+                                          This is a preview of what your card component might look like based on the generated code.
+                                        </p>
+                                      </div>
+                                      <div className="px-6 pt-4 pb-2">
+                                        <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                                          Action
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : generatedCode.includes('Form') || generatedCode.includes('form') ? (
+                                    /* Form component preview */
+                                    <div className="max-w-md mx-auto">
+                                      <form className="bg-white dark:bg-zinc-800 shadow-md rounded px-8 pt-6 pb-8 mb-4">
+                                        <div className="mb-4">
+                                          <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="username">
+                                            Username
+                                          </label>
+                                          <input className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-zinc-700 dark:border-zinc-600 dark:text-white" id="username" type="text" placeholder="Username" />
+                                        </div>
+                                        <div className="mb-6">
+                                          <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="password">
+                                            Password
+                                          </label>
+                                          <input className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline dark:bg-zinc-700 dark:border-zinc-600 dark:text-white" id="password" type="password" placeholder="******************" />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" type="button">
+                                            Sign In
+                                          </button>
+                                          <a className="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800" href="#">
+                                            Forgot Password?
+                                          </a>
+                                        </div>
+                                      </form>
+                                    </div>
+                                  ) : (
+                                    /* Generic component preview */
+                                    <div className="text-center">
+                                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Component preview based on the generated code</p>
+                                      <div className="p-4 border rounded bg-gray-50 dark:bg-zinc-800 text-gray-800 dark:text-gray-200">
+                                        [React Component Preview]
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                                  <p>To see the actual component in action, copy the code and use it in your React application.</p>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Non-React code notification */
+                              <div className="p-6 border rounded-md border-dashed border-zinc-300 dark:border-zinc-700">
+                                <div className="mb-4 p-4 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-md">
+                                  <p>Live preview is currently available for HTML code.</p>
+                                  <p className="text-sm mt-1">For {framework}, you would typically run this code in your development environment.</p>
+                                </div>
+                                <h3 className="text-lg font-medium mb-2">Code Output Preview</h3>
+                                <p>Generated {language} code would run here</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                // Error or no code yet generated
+                <div className="relative bg-zinc-950 rounded-md overflow-hidden">
+                  {error ? (
+                    <div className="p-4 mb-4 bg-red-100 text-red-700 rounded-md">
+                      <h3 className="font-bold">Connection Error</h3>
+                      <p>{error}</p>
+                      <button 
+                        className="mt-2 px-3 py-1 bg-red-600 text-white rounded-md text-sm"
+                        onClick={async () => {
+                          const connectionTest = await testBackendConnection();
+                          if (connectionTest.success) {
+                            setError(null);
+                            getAvailableModels().then(data => {
+                              if (data && data.models) {
+                                setAvailableModels(data.models);
+                              }
+                            });
+                          } else {
+                            setError(`Still unable to connect: ${connectionTest.error}`);
+                          }
+                        }}
+                      >
+                        Retry Connection
+                      </button>
+                    </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-[300px] text-zinc-500">
                       <Code className="h-12 w-12 mb-2 opacity-20" />
                       <p>Generated code will appear here</p>
                     </div>
-                  )
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
