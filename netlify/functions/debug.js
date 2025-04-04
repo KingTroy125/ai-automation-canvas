@@ -10,6 +10,7 @@ export const handler = async (event, context) => {
       SITE_NAME: process.env.SITE_NAME,
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? "Set (redacted)" : "Not set",
       OPENAI_API_KEY: process.env.OPENAI_API_KEY ? "Set (redacted)" : "Not set",
+      DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ? "Set (redacted)" : "Not set",
     },
     event_method: event.httpMethod,
     event_path: event.path,

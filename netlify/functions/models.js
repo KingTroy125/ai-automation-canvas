@@ -20,15 +20,19 @@ const OPENAI_MODELS = {
 };
 
 export const handler = async (event, context) => {
+  // Always add CORS headers
+  const CORS_HEADERS = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+  };
+
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-      },
+      headers: CORS_HEADERS,
       body: ''
     };
   }
@@ -37,11 +41,7 @@ export const handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-      },
+      headers: CORS_HEADERS,
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -102,16 +102,31 @@ export const handler = async (event, context) => {
       console.log("No OpenAI API key found");
     }
     
+    // Add DeepSeek models if available
+    if (process.env.DEEPSEEK_API_KEY) {
+      console.log("Adding DeepSeek models");
+      const deepseekModels = {
+        "deepseek-chat": "DeepSeek Chat",
+        "deepseek-coder": "DeepSeek Coder",
+        "deepseek-v3": "DeepSeek v3"
+      };
+      
+      for (const [modelId, modelName] of Object.entries(deepseekModels)) {
+        availableModels.push({
+          id: modelId,
+          name: modelName,
+          provider: "deepseek"
+        });
+      }
+    } else {
+      console.log("No DeepSeek API key found");
+    }
+    
     console.log(`Returning ${availableModels.length} models`);
     
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-      },
+      headers: CORS_HEADERS,
       body: JSON.stringify({ models: availableModels })
     };
     
@@ -121,12 +136,7 @@ export const handler = async (event, context) => {
     // Always return at least these mock models to prevent frontend errors
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-      },
+      headers: CORS_HEADERS,
       body: JSON.stringify({ 
         models: [
           {

@@ -6,6 +6,7 @@
 [functions]
   node_bundler = "esbuild"
   included_files = [".env"]
+  external_node_modules = ["node-fetch"]
   
 [build.environment]
   NODE_VERSION = "18.17.0"
