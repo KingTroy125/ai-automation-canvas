@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Mail, FileText, User, Upload, Save, Bell, Shield, Trash2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { getProfile, updateProfile, Profile as ProfileType } from '@/lib/profile-service';
+import { getProfile, updateProfile, Profile as ProfileType, forceCreateProfile } from '@/lib/profile-service';
 import { useAuth } from '@/lib/auth-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -178,6 +178,33 @@ const Profile: React.FC = () => {
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
+        )}
+        
+        {error && (
+          <div className="mt-4">
+            <Button 
+              variant="destructive" 
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const { data, error: createError } = await forceCreateProfile();
+                  if (createError) {
+                    toast.error("Failed to fix profile: " + createError.message);
+                  } else {
+                    toast.success("Profile fixed! Refreshing...");
+                    window.location.reload();
+                  }
+                } catch (err) {
+                  console.error("Error fixing profile:", err);
+                  toast.error("Unexpected error fixing profile");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              Fix Profile
+            </Button>
+          </div>
         )}
         
         <Tabs defaultValue="profile" className="w-full">
