@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -29,6 +28,8 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth-context';
+import { UserAccountNav } from './user-account-nav';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -36,10 +37,17 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
-  const handleLogout = () => {
-    toast.success('Logged out successfully');
-    setTimeout(() => navigate('/login'), 1000);
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast.error('Failed to log out');
+    }
   };
 
   return (
@@ -155,15 +163,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <header className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
               <SidebarTrigger />
               <div className="ml-auto flex items-center space-x-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full"
-                  onClick={() => navigate('/dashboard/profile')}
-                >
-                  <User className="h-5 w-5" />
-                  <span className="sr-only">User</span>
-                </Button>
+                <UserAccountNav />
               </div>
             </header>
             <main className="flex-1 p-4 md:p-6">

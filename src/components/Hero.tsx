@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import AnimatedGradient from './ui/AnimatedGradient';
 import { TextEffect } from './motion-primitives/text-effect';
 import GlassMorphism from './ui/GlassMorphism';
-import { ArrowRight, Bot, BrainCircuit, PlusIcon, X } from 'lucide-react';
+import { ArrowRight, Bot, BrainCircuit, PlusIcon, X, Play } from 'lucide-react';
 import { Cursor } from '@/components/core/cursor';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -106,8 +106,9 @@ const Hero = () => {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link to="/dashboard">Try Demo</Link>
+            <Button size="lg" variant="outline" className="gap-2" onClick={() => setShowVideo(true)}>
+              <Play className="h-4 w-4" />
+              Watch Demo
             </Button>
           </AnimatedGroup>
 
@@ -146,7 +147,7 @@ const Hero = () => {
                       onClick={handleMoreClick}
                     >
                       <div className="inline-flex items-center text-sm text-white dark:text-black">
-                        More <PlusIcon className="ml-1 h-4 w-4" />
+                        Play <Play className="ml-1 h-3 w-3" />
                       </div>
                     </motion.div>
                   ) : null}
@@ -157,17 +158,20 @@ const Hero = () => {
             <GlassMorphism className="p-4 w-full" intensity="medium">
               <div 
                 ref={targetRef} 
-                className="aspect-video relative overflow-hidden rounded-lg border border-foreground/10 bg-gradient-to-br from-background to-secondary/10"
+                className="aspect-video relative overflow-hidden rounded-lg border border-foreground/10 bg-gradient-to-br from-background to-secondary/10 cursor-pointer"
+                onClick={() => setShowVideo(true)}
               >
                 <img 
-                  src="../../public/images/ai-development-agent-dashboard.png" 
+                  src="/images/ai-development-agent-dashboard.png" 
                   alt="AI Development Agent Dashboard" 
                   className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="flex items-center justify-center space-x-4">
-                    <Bot className="h-12 w-12 text-primary animate-pulse-slow" />
-                    <span className="text-xl font-medium">AI Development Agent</span>
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <div className="w-16 h-16 rounded-full bg-primary/80 flex items-center justify-center">
+                      <Play className="h-8 w-8 text-white ml-1" />
+                    </div>
+                    <span className="text-xl font-medium">Watch Demo Video</span>
                   </div>
                 </div>
               </div>
@@ -202,8 +206,8 @@ const Hero = () => {
                 <iframe
                   width="100%"
                   height="100%"
-                  src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1"
-                  title="YouTube video player"
+                  src="https://www.youtube-nocookie.com/embed/YOUR_VIDEO_ID?autoplay=1"
+                  title="AI Development Agent Demo"
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
